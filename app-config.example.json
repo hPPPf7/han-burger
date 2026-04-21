@@ -1,0 +1,11 @@
+{
+  "googleOAuth": {
+    "clientId": "80358937103-uem8oe65339cfrv44pgruc8evihf663g.apps.googleusercontent.com",
+    "clientSecret": "",
+    "scopes": [
+      "openid",
+      "email",
+      "profile"
+    ]
+  }
+}

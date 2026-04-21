@@ -1,0 +1,65 @@
+{
+  "name": "han-burger-desktop",
+  "version": "0.1.0",
+  "description": "Han Burger desktop shell with Google sign-in, project launcher, local storage, and auto-update scaffolding.",
+  "main": "src/main/main.js",
+  "author": "OpenAI Codex",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/hPPPf7/han-burger.git"
+  },
+  "scripts": {
+    "dev": "electron .",
+    "start": "electron .",
+    "build": "node scripts/prepare-runtime-config.js && electron-builder --win nsis",
+    "build:dir": "electron-builder --win dir",
+    "release:github": "node scripts/prepare-runtime-config.js && electron-builder --win nsis --publish always",
+    "postinstall": "electron-builder install-app-deps"
+  },
+  "build": {
+    "appId": "com.hanburger.desktop",
+    "productName": "Han Burger Desktop",
+    "directories": {
+      "output": "dist",
+      "buildResources": "build"
+    },
+    "files": [
+      "src/**/*",
+      "build/app-data/**/*",
+      "build/runtime-config/**/*",
+      "app-config.example.json",
+      "package.json"
+    ],
+    "extraMetadata": {
+      "main": "src/main/main.js"
+    },
+    "nsis": {
+      "artifactName": "Han-Burger-Desktop-${version}-setup.${ext}",
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true
+    },
+    "publish": [
+      {
+        "provider": "github",
+        "owner": "hPPPf7",
+        "repo": "han-burger",
+        "releaseType": "release"
+      }
+    ],
+    "win": {
+      "signAndEditExecutable": false,
+      "target": [
+        "nsis"
+      ]
+    }
+  },
+  "dependencies": {
+    "electron-log": "^5.2.4",
+    "electron-updater": "^6.3.9"
+  },
+  "devDependencies": {
+    "electron": "^37.2.0",
+    "electron-builder": "^26.0.12"
+  }
+}
