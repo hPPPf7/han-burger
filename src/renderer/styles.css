@@ -102,6 +102,17 @@ body {
   color: var(--text);
 }
 
+.titlebar-version {
+  padding: 3px 8px;
+  border-radius: 999px;
+  background: var(--accent-soft);
+  border: 1px solid var(--accent-border);
+  color: var(--accent);
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+}
+
 .titlebar-dot {
   width: 10px;
   height: 10px;
@@ -152,7 +163,7 @@ body {
 
 .app-shell {
   display: grid;
-  grid-template-columns: 290px 1fr;
+  grid-template-columns: 196px 1fr;
   min-height: 0;
   height: 100%;
   overflow: hidden;
@@ -162,13 +173,23 @@ body {
   display: flex;
   flex-direction: column;
   gap: 18px;
-  padding: 24px 20px;
-  width: 290px;
-  min-width: 290px;
+  padding: 20px 12px;
+  width: 196px;
+  min-width: 196px;
   height: 100%;
   overflow: hidden;
   background: var(--surface-1);
   border-right: 1px solid var(--border-subtle);
+}
+
+.brand-block h1 {
+  font-size: 20px;
+  line-height: 1.15;
+}
+
+.brand-block p {
+  margin-top: 10px;
+  font-size: 13px;
 }
 
 .brand-block h1,
@@ -261,23 +282,26 @@ body {
 }
 
 .user-card {
-  display: grid;
-  grid-template-columns: 54px 1fr;
-  gap: 14px;
+  display: inline-flex;
   align-items: center;
+  justify-content: center;
   margin-top: auto;
-  padding: 16px;
-  border-radius: 20px;
-  background: var(--surface-4);
-  border: 1px solid var(--border-subtle);
+  align-self: center;
+  padding: 0;
+  border-radius: 0;
+  background: transparent;
+  border: none;
+  box-shadow: none;
   cursor: pointer;
-  transition: border-color 140ms ease, background 140ms ease, transform 140ms ease;
+  transition: transform 140ms ease;
 }
 
 .user-card:hover {
   transform: translateY(-1px);
-  border-color: var(--accent-border);
-  background: var(--accent-soft);
+}
+
+.user-card:hover .avatar {
+  box-shadow: 0 0 0 3px var(--accent-soft);
 }
 
 .avatar {
@@ -294,15 +318,13 @@ body {
   background-position: center;
 }
 
+.user-card > div:last-child,
 .user-name {
-  font-size: 15px;
-  font-weight: 700;
+  display: none;
 }
 
 .user-email {
-  margin-top: 4px;
-  color: var(--muted);
-  font-size: 12px;
+  display: none;
 }
 
 .content {
@@ -477,6 +499,27 @@ body {
   box-shadow: var(--shadow);
 }
 
+.update-panel {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  padding: 20px 22px;
+  border: 1px solid var(--accent-border);
+  border-radius: 22px;
+  background: var(--accent-soft);
+}
+
+.update-panel h3 {
+  margin: 0;
+}
+
+.update-panel p {
+  margin: 10px 0 0;
+  color: var(--muted);
+  line-height: 1.7;
+}
+
 @media (max-width: 1080px) {
   .app-shell {
     grid-template-columns: 1fr;
@@ -498,7 +541,8 @@ body {
   }
 
   .page-head,
-  .account-hero {
+  .account-hero,
+  .update-panel {
     grid-template-columns: 1fr;
     flex-direction: column;
   }

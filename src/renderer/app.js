@@ -6,10 +6,12 @@ const state = {
   notes: null,
   theme: "dark",
   isMaximized: false,
-  activeView: "login"
+  activeView: "login",
+  isSigningIn: false
 };
 
 const elements = {
+  titlebarVersion: document.getElementById("titlebar-version"),
   themeToggleButton: document.getElementById("theme-toggle-button"),
   minimizeButton: document.getElementById("minimize-button"),
   maximizeButton: document.getElementById("maximize-button"),
@@ -19,6 +21,7 @@ const elements = {
   removeProjectButton: document.getElementById("remove-project-button"),
   googleLoginButton: document.getElementById("google-login-button"),
   checkUpdatesButton: document.getElementById("check-updates-button"),
+  restartUpdateButton: document.getElementById("restart-update-button"),
   accountLogoutButton: document.getElementById("account-logout-button"),
   loginView: document.getElementById("login-view"),
   accountView: document.getElementById("account-view"),
@@ -31,12 +34,16 @@ const elements = {
   updateStatus: document.getElementById("update-status"),
   desktopNote: document.getElementById("desktop-note"),
   mobileNote: document.getElementById("mobile-note"),
+  loginCurrentVersion: document.getElementById("login-current-version"),
   googleConfigStatus: document.getElementById("google-config-status"),
   updateConfigStatus: document.getElementById("update-config-status"),
   dashboardTitle: document.getElementById("dashboard-title"),
   dashboardUser: document.getElementById("dashboard-user"),
+  dashboardCurrentVersion: document.getElementById("dashboard-current-version"),
+  dashboardLatestVersion: document.getElementById("dashboard-latest-version"),
   dashboardProjectCount: document.getElementById("dashboard-project-count"),
   dashboardDataRoot: document.getElementById("dashboard-data-root"),
+  updateDetail: document.getElementById("update-detail"),
   selectedProjectName: document.getElementById("selected-project-name"),
   selectedProjectDescription: document.getElementById("selected-project-description"),
   selectedProjectPath: document.getElementById("selected-project-path"),
@@ -49,6 +56,36 @@ const elements = {
   accountProfilePath: document.getElementById("account-profile-path"),
   accountUpdatedAt: document.getElementById("account-updated-at")
 };
+
+state.updateStatus = {
+  stage: "idle",
+  currentVersion: "-",
+  latestVersion: "-",
+  downloaded: false,
+  message: "啟動時會自動檢查一次"
+};
+
+function renderVersionInfo() {
+  const currentVersion = state.appVersion || state.updateStatus.currentVersion || "-";
+  const latestVersion = state.updateStatus.latestVersion || currentVersion || "-";
+
+  elements.titlebarVersion.textContent = `v${currentVersion}`;
+  elements.loginCurrentVersion.textContent = `v${currentVersion}`;
+  elements.dashboardCurrentVersion.textContent = `v${currentVersion}`;
+  elements.dashboardLatestVersion.textContent = latestVersion === currentVersion ? `v${currentVersion}` : `v${latestVersion}`;
+}
+
+function renderUpdateStatus() {
+  elements.updateStatus.textContent = state.updateStatus.message;
+  elements.updateDetail.textContent = state.updateStatus.downloaded
+    ? `目前版本 v${state.updateStatus.currentVersion}，新版本 v${state.updateStatus.latestVersion} 已下載完成。`
+    : state.updateStatus.latestVersion && state.updateStatus.latestVersion !== state.updateStatus.currentVersion
+      ? `目前版本 v${state.updateStatus.currentVersion}，系統正在處理新版本 v${state.updateStatus.latestVersion}。`
+      : `目前版本 v${state.updateStatus.currentVersion}。啟動時會自動檢查新版本。`;
+
+  elements.restartUpdateButton.classList.toggle("hidden", !state.updateStatus.downloaded);
+  renderVersionInfo();
+}
 
 function setActiveView(viewName) {
   state.activeView = viewName;
@@ -178,6 +215,8 @@ function renderUser() {
 }
 
 function renderMeta(config) {
+  renderVersionInfo();
+  renderUpdateStatus();
   elements.dataRoot.textContent = state.paths.dataRoot;
   elements.dashboardDataRoot.textContent = state.paths.dataRoot;
   elements.desktopNote.textContent = state.notes.desktopDistribution;
@@ -199,6 +238,7 @@ function renderAll(config) {
 }
 
 function applyBootstrap(payload) {
+  state.appVersion = payload.appVersion || state.appVersion || "-";
   state.projects = payload.projects;
   state.user = payload.user;
   state.paths = payload.paths;
@@ -216,9 +256,15 @@ function applyBootstrap(payload) {
   renderAll(payload.config);
 }
 
-elements.googleLoginButton.addEventListener("click", async () => {
+async function startGoogleLogin() {
+  if (state.isSigningIn) {
+    return;
+  }
+
+  state.isSigningIn = true;
   elements.googleLoginButton.disabled = true;
   elements.googleLoginButton.textContent = "等待 Google 登入...";
+  elements.updateStatus.textContent = "正在開啟 Google 登入...";
 
   try {
     const payload = await window.hanBurger.signInWithGoogle();
@@ -226,9 +272,14 @@ elements.googleLoginButton.addEventListener("click", async () => {
   } catch (error) {
     elements.updateStatus.textContent = `登入失敗: ${error.message}`;
   } finally {
+    state.isSigningIn = false;
     elements.googleLoginButton.disabled = false;
     elements.googleLoginButton.textContent = "使用 Google 登入";
   }
+}
+
+elements.googleLoginButton.addEventListener("click", async () => {
+  await startGoogleLogin();
 });
 
 elements.removeProjectButton.addEventListener("click", async () => {
@@ -244,13 +295,25 @@ elements.checkUpdatesButton.addEventListener("click", async () => {
   await window.hanBurger.triggerUpdateCheck();
 });
 
+elements.restartUpdateButton.addEventListener("click", async () => {
+  elements.restartUpdateButton.disabled = true;
+  elements.restartUpdateButton.textContent = "正在重新啟動...";
+  const didRestart = await window.hanBurger.restartAndInstallUpdate();
+
+  if (!didRestart) {
+    elements.restartUpdateButton.disabled = false;
+    elements.restartUpdateButton.textContent = "重新啟動並更新";
+    elements.updateStatus.textContent = "目前還沒有可套用的更新。";
+  }
+});
+
 elements.userCard.addEventListener("click", () => {
   if (state.user) {
     showAccountView();
     return;
   }
 
-  showLoginView();
+  void startGoogleLogin();
 });
 
 elements.accountLogoutButton.addEventListener("click", async () => {
@@ -279,7 +342,14 @@ window.hanBurger.onAuthChanged((payload) => {
 });
 
 window.hanBurger.onUpdateStatus((payload) => {
-  elements.updateStatus.textContent = payload.message;
+  state.updateStatus = {
+    ...state.updateStatus,
+    ...payload,
+    currentVersion: payload.currentVersion || state.appVersion || state.updateStatus.currentVersion || "-",
+    latestVersion: payload.latestVersion || state.updateStatus.latestVersion || payload.currentVersion || state.appVersion || "-",
+    downloaded: Boolean(payload.downloaded)
+  };
+  renderUpdateStatus();
 });
 
 window.hanBurger.onWindowStateChanged((payload) => {

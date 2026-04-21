@@ -72,6 +72,7 @@ function getBootstrapData() {
       ),
       updateFeedConfigured: true
     },
+    appVersion: app.getVersion(),
     user,
     projects,
     paths: {
@@ -141,6 +142,14 @@ function registerIpc() {
     }
 
     return updater.checkForUpdates();
+  });
+
+  ipcMain.handle("restart-and-install-update", async () => {
+    if (!updater) {
+      return false;
+    }
+
+    return updater.restartToApplyUpdate();
   });
 
   ipcMain.handle("window-minimize", async () => {

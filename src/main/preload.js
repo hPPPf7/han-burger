@@ -7,6 +7,7 @@ contextBridge.exposeInMainWorld("hanBurger", {
   installProject: () => ipcRenderer.invoke("install-project"),
   removeProject: (projectId) => ipcRenderer.invoke("remove-project", projectId),
   triggerUpdateCheck: () => ipcRenderer.invoke("trigger-update-check"),
+  restartAndInstallUpdate: () => ipcRenderer.invoke("restart-and-install-update"),
   minimizeWindow: () => ipcRenderer.invoke("window-minimize"),
   maximizeWindow: () => ipcRenderer.invoke("window-maximize"),
   closeWindow: () => ipcRenderer.invoke("window-close"),

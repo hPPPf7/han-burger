@@ -7,6 +7,62 @@ function ensureDirectory(dirPath) {
   return dirPath;
 }
 
+function readJsonSafe(filePath) {
+  try {
+    return JSON.parse(fs.readFileSync(filePath, "utf8"));
+  } catch {
+    return null;
+  }
+}
+
+function syncConfigFromTemplate(appConfigPath, configTemplatePath) {
+  if (!fs.existsSync(configTemplatePath)) {
+    return;
+  }
+
+  if (!fs.existsSync(appConfigPath)) {
+    fs.copyFileSync(configTemplatePath, appConfigPath);
+    return;
+  }
+
+  const currentConfig = readJsonSafe(appConfigPath);
+  const templateConfig = readJsonSafe(configTemplatePath);
+  if (!currentConfig || !templateConfig) {
+    return;
+  }
+
+  const nextConfig = {
+    ...currentConfig,
+    googleOAuth: {
+      ...(currentConfig.googleOAuth || {})
+    }
+  };
+
+  let didChange = false;
+
+  const currentOAuth = currentConfig.googleOAuth || {};
+  const templateOAuth = templateConfig.googleOAuth || {};
+
+  if (!currentOAuth.clientId && templateOAuth.clientId) {
+    nextConfig.googleOAuth.clientId = templateOAuth.clientId;
+    didChange = true;
+  }
+
+  if (!currentOAuth.clientSecret && templateOAuth.clientSecret) {
+    nextConfig.googleOAuth.clientSecret = templateOAuth.clientSecret;
+    didChange = true;
+  }
+
+  if ((!Array.isArray(currentOAuth.scopes) || currentOAuth.scopes.length === 0) && Array.isArray(templateOAuth.scopes)) {
+    nextConfig.googleOAuth.scopes = templateOAuth.scopes;
+    didChange = true;
+  }
+
+  if (didChange) {
+    fs.writeFileSync(appConfigPath, `${JSON.stringify(nextConfig, null, 2)}\n`, "utf8");
+  }
+}
+
 function getExecutableRoot() {
   if (app.isPackaged) {
     return path.dirname(app.getPath("exe"));
@@ -97,9 +153,7 @@ function initializeStorage() {
 
   const configTemplatePath = getConfigTemplatePath();
   const appConfigPath = path.join(paths.configRoot, "app-config.json");
-  if (!fs.existsSync(appConfigPath) && fs.existsSync(configTemplatePath)) {
-    fs.copyFileSync(configTemplatePath, appConfigPath);
-  }
+  syncConfigFromTemplate(appConfigPath, configTemplatePath);
 
   return paths;
 }

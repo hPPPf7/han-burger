@@ -17,6 +17,7 @@
           <div class="titlebar-brand">
             <span class="titlebar-dot"></span>
             <span>Han Burger Desktop</span>
+            <span id="titlebar-version" class="titlebar-version">v-</span>
           </div>
         </div>
 
@@ -74,6 +75,10 @@
                 <div class="status-card">
                   <span class="status-label">手機端</span>
                   <strong id="mobile-note"></strong>
+                </div>
+                <div class="status-card">
+                  <span class="status-label">目前版本</span>
+                  <strong id="login-current-version">-</strong>
                 </div>
                 <div class="status-card">
                   <span class="status-label">Google 設定</span>
@@ -139,6 +144,14 @@
 
             <div class="page-grid">
               <div class="status-card">
+                <span class="status-label">目前版本</span>
+                <strong id="dashboard-current-version"></strong>
+              </div>
+              <div class="status-card">
+                <span class="status-label">最新版本</span>
+                <strong id="dashboard-latest-version"></strong>
+              </div>
+              <div class="status-card">
                 <span class="status-label">登入帳號</span>
                 <strong id="dashboard-user"></strong>
               </div>
@@ -154,6 +167,15 @@
                 <span class="status-label">更新狀態</span>
                 <strong id="update-status">啟動時會自動檢查一次</strong>
               </div>
+            </div>
+
+            <div class="update-panel">
+              <div>
+                <div class="eyebrow">Update</div>
+                <h3>桌面版更新</h3>
+                <p id="update-detail">啟動後會自動檢查新版本，下載完成後可直接重新啟動套用更新。</p>
+              </div>
+              <button id="restart-update-button" class="primary-button hidden">重新啟動並更新</button>
             </div>
 
             <div class="project-detail project-detail-standalone">
