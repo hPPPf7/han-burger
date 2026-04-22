@@ -78,12 +78,13 @@ function renderVersionInfo() {
 function renderUpdateStatus() {
   elements.updateStatus.textContent = state.updateStatus.message;
   elements.updateDetail.textContent = state.updateStatus.downloaded
-    ? `目前版本 v${state.updateStatus.currentVersion}，新版本 v${state.updateStatus.latestVersion} 已下載完成。`
+    ? `目前版本 v${state.updateStatus.currentVersion}，新版本 v${state.updateStatus.latestVersion} 已下載完成，系統將自動重新啟動套用更新。`
     : state.updateStatus.latestVersion && state.updateStatus.latestVersion !== state.updateStatus.currentVersion
       ? `目前版本 v${state.updateStatus.currentVersion}，系統正在處理新版本 v${state.updateStatus.latestVersion}。`
       : `目前版本 v${state.updateStatus.currentVersion}。啟動時會自動檢查新版本。`;
 
   elements.restartUpdateButton.classList.toggle("hidden", !state.updateStatus.downloaded);
+  elements.restartUpdateButton.textContent = "立即重新啟動";
   renderVersionInfo();
 }
 
@@ -168,6 +169,8 @@ function renderSelectedProject() {
 
 function renderUser() {
   if (!state.user) {
+    elements.userCard.classList.add("is-logged-out");
+    elements.userCard.classList.remove("is-logged-in");
     elements.userName.textContent = "尚未登入";
     elements.userEmail.textContent = "請先使用 Google 登入";
     elements.avatar.textContent = "?";
@@ -183,6 +186,8 @@ function renderUser() {
     return;
   }
 
+  elements.userCard.classList.add("is-logged-in");
+  elements.userCard.classList.remove("is-logged-out");
   elements.userName.textContent = state.user.name;
   elements.userEmail.textContent = state.user.email;
   elements.avatar.textContent = state.user.name?.slice(0, 1)?.toUpperCase() || "G";

@@ -304,6 +304,40 @@ body {
   box-shadow: 0 0 0 3px var(--accent-soft);
 }
 
+.user-card.is-logged-out {
+  gap: 10px;
+  align-self: stretch;
+  justify-content: flex-start;
+}
+
+.user-card.is-logged-out .avatar {
+  width: 42px;
+  height: 42px;
+  font-size: 18px;
+}
+
+.user-card.is-logged-out > div:last-child {
+  display: block;
+}
+
+.user-card.is-logged-out .user-name {
+  display: block;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.user-card.is-logged-out .user-email {
+  display: block;
+  margin-top: 2px;
+  color: var(--muted);
+  font-size: 11px;
+  line-height: 1.4;
+}
+
+.user-card.is-logged-in > div:last-child {
+  display: none;
+}
+
 .avatar {
   display: grid;
   place-items: center;
@@ -318,6 +352,8 @@ body {
   background-position: center;
 }
 
+.user-card.is-logged-in .user-name,
+.user-card.is-logged-in .user-email,
 .user-card > div:last-child,
 .user-name {
   display: none;

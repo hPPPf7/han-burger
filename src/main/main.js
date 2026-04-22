@@ -1,6 +1,6 @@
 const fs = require("node:fs");
 const path = require("node:path");
-const { app, BrowserWindow, ipcMain } = require("electron");
+const { app, BrowserWindow, ipcMain, Notification } = require("electron");
 const { initializeStorage } = require("./paths");
 const { createStore } = require("./store");
 const { openGoogleSignIn } = require("./oauth");
@@ -39,6 +39,18 @@ function createWindow() {
     mainWindow.webContents.send("window-state-changed", {
       isMaximized: mainWindow.isMaximized()
     });
+
+    const startupUpdateStatus = updater?.getStartupStatus?.();
+    if (startupUpdateStatus) {
+      mainWindow.webContents.send("update-status", startupUpdateStatus);
+
+      if (Notification.isSupported()) {
+        new Notification({
+          title: "Han Burger Desktop 已完成更新",
+          body: `目前版本 ${app.getVersion()}，已自動重新開啟。`
+        }).show();
+      }
+    }
 
     if (updater) {
       await updater.checkForUpdates();
