@@ -153,6 +153,14 @@ function configureUpdater(mainWindow) {
       clearTimeout(autoRestartTimer);
     }
 
+    mainWindow.webContents.send("update-status", {
+      stage: "installing",
+      currentVersion: app.getVersion(),
+      latestVersion: info.version,
+      downloaded: true,
+      message: `即將重新啟動並套用新版本 ${info.version}`
+    });
+
     autoRestartTimer = setTimeout(() => {
       writePendingUpdateMarker(info.version);
       autoUpdater.quitAndInstall(false, true);

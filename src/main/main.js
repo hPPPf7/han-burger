@@ -10,6 +10,7 @@ let mainWindow;
 let appPaths;
 let store;
 let updater;
+const APP_USER_MODEL_ID = "com.hanburger.desktop";
 
 function ensureProjectDirectories(projects) {
   for (const project of projects) {
@@ -182,6 +183,7 @@ function registerIpc() {
 }
 
 app.whenReady().then(() => {
+  app.setAppUserModelId(APP_USER_MODEL_ID);
   appPaths = initializeStorage();
   store = createStore(appPaths);
   createWindow();

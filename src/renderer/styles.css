@@ -364,11 +364,42 @@ body {
 }
 
 .content {
+  position: relative;
   display: flex;
   padding: 24px 28px 28px;
   min-width: 0;
   min-height: 0;
   overflow: auto;
+}
+
+.update-install-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 20;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  background: rgba(9, 8, 7, 0.76);
+  backdrop-filter: blur(6px);
+}
+
+.update-install-card {
+  width: min(420px, calc(100% - 24px));
+  padding: 28px 24px;
+  border-radius: 24px;
+  border: 1px solid var(--accent-border);
+  background: var(--surface-2);
+  box-shadow: var(--shadow);
+}
+
+.update-install-card h2 {
+  margin: 0;
+}
+
+.update-install-card p {
+  margin: 12px 0 0;
+  color: var(--muted);
+  line-height: 1.7;
 }
 
 .status-card,

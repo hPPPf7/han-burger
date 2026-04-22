@@ -26,6 +26,8 @@ const elements = {
   loginView: document.getElementById("login-view"),
   accountView: document.getElementById("account-view"),
   dashboardView: document.getElementById("dashboard-view"),
+  updateInstallOverlay: document.getElementById("update-install-overlay"),
+  updateInstallMessage: document.getElementById("update-install-message"),
   userName: document.getElementById("user-name"),
   userEmail: document.getElementById("user-email"),
   avatar: document.getElementById("avatar"),
@@ -77,6 +79,10 @@ function renderVersionInfo() {
 
 function renderUpdateStatus() {
   elements.updateStatus.textContent = state.updateStatus.message;
+  elements.updateInstallOverlay.classList.toggle("hidden", state.updateStatus.stage !== "installing");
+  elements.updateInstallMessage.textContent = state.updateStatus.stage === "installing"
+    ? state.updateStatus.message
+    : "請稍候，桌面版將自動重新啟動。";
   elements.updateDetail.textContent = state.updateStatus.downloaded
     ? `目前版本 v${state.updateStatus.currentVersion}，新版本 v${state.updateStatus.latestVersion} 已下載完成，系統將自動重新啟動套用更新。`
     : state.updateStatus.latestVersion && state.updateStatus.latestVersion !== state.updateStatus.currentVersion
