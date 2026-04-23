@@ -25,6 +25,7 @@ function createWindow() {
     minWidth: 1180,
     minHeight: 760,
     backgroundColor: "#0f1415",
+    show: true,
     frame: false,
     autoHideMenuBar: true,
     webPreferences: {
@@ -54,7 +55,7 @@ function createWindow() {
     }
 
     if (updater) {
-      await updater.checkForUpdates();
+      await updater.checkForStartupUpdates();
     }
   });
 
@@ -68,6 +69,10 @@ function createWindow() {
     mainWindow.webContents.send("window-state-changed", {
       isMaximized: false
     });
+  });
+
+  mainWindow.on("closed", () => {
+    mainWindow = null;
   });
 }
 

@@ -26,8 +26,12 @@ const elements = {
   loginView: document.getElementById("login-view"),
   accountView: document.getElementById("account-view"),
   dashboardView: document.getElementById("dashboard-view"),
-  updateInstallOverlay: document.getElementById("update-install-overlay"),
-  updateInstallMessage: document.getElementById("update-install-message"),
+  updateOverlay: document.getElementById("update-overlay"),
+  updateOverlayTitle: document.getElementById("update-overlay-title"),
+  updateOverlayMessage: document.getElementById("update-overlay-message"),
+  updateOverlayProgress: document.getElementById("update-overlay-progress"),
+  updateOverlayProgressFill: document.getElementById("update-overlay-progress-fill"),
+  updateOverlayProgressLabel: document.getElementById("update-overlay-progress-label"),
   userName: document.getElementById("user-name"),
   userEmail: document.getElementById("user-email"),
   avatar: document.getElementById("avatar"),
@@ -46,6 +50,9 @@ const elements = {
   dashboardProjectCount: document.getElementById("dashboard-project-count"),
   dashboardDataRoot: document.getElementById("dashboard-data-root"),
   updateDetail: document.getElementById("update-detail"),
+  updateProgress: document.getElementById("update-progress"),
+  updateProgressFill: document.getElementById("update-progress-fill"),
+  updateProgressLabel: document.getElementById("update-progress-label"),
   selectedProjectName: document.getElementById("selected-project-name"),
   selectedProjectDescription: document.getElementById("selected-project-description"),
   selectedProjectPath: document.getElementById("selected-project-path"),
@@ -63,6 +70,8 @@ state.updateStatus = {
   stage: "idle",
   currentVersion: "-",
   latestVersion: "-",
+  progressPercent: 0,
+  startupFlow: false,
   downloaded: false,
   message: "啟動時會自動檢查一次"
 };
@@ -78,20 +87,60 @@ function renderVersionInfo() {
 }
 
 function renderUpdateStatus() {
+  const progressPercent = Math.max(0, Math.min(100, Math.round(state.updateStatus.progressPercent || 0)));
+  const showProgress = state.updateStatus.stage === "downloading" || state.updateStatus.stage === "downloaded" || state.updateStatus.stage === "installing";
+
   elements.updateStatus.textContent = state.updateStatus.message;
-  elements.updateInstallOverlay.classList.toggle("hidden", state.updateStatus.stage !== "installing");
-  elements.updateInstallMessage.textContent = state.updateStatus.stage === "installing"
-    ? state.updateStatus.message
-    : "請稍候，桌面版將自動重新啟動。";
   elements.updateDetail.textContent = state.updateStatus.downloaded
     ? `目前版本 v${state.updateStatus.currentVersion}，新版本 v${state.updateStatus.latestVersion} 已下載完成，系統將自動重新啟動套用更新。`
     : state.updateStatus.latestVersion && state.updateStatus.latestVersion !== state.updateStatus.currentVersion
-      ? `目前版本 v${state.updateStatus.currentVersion}，系統正在處理新版本 v${state.updateStatus.latestVersion}。`
+      ? `目前版本 v${state.updateStatus.currentVersion}，系統正在處理新版本 v${state.updateStatus.latestVersion}${state.updateStatus.stage === "downloading" ? `，目前已下載 ${progressPercent}%` : ""}。`
       : `目前版本 v${state.updateStatus.currentVersion}。啟動時會自動檢查新版本。`;
+  elements.updateProgress.classList.toggle("hidden", !showProgress);
+  elements.updateProgressFill.style.width = `${state.updateStatus.downloaded ? 100 : progressPercent}%`;
+  elements.updateProgressLabel.textContent = state.updateStatus.downloaded ? "100%" : `${progressPercent}%`;
 
   elements.restartUpdateButton.classList.toggle("hidden", !state.updateStatus.downloaded);
   elements.restartUpdateButton.textContent = "立即重新啟動";
+  renderUpdateOverlay();
   renderVersionInfo();
+}
+
+function renderUpdateOverlay() {
+  const progressPercent = Math.max(0, Math.min(100, Math.round(state.updateStatus.progressPercent || 0)));
+  const isStartupChecking = Boolean(state.updateStatus.startupFlow) &&
+    ["checking", "available", "downloading", "downloaded"].includes(state.updateStatus.stage);
+  const isInstalling = state.updateStatus.stage === "installing";
+  const shouldShow = isStartupChecking || isInstalling;
+  const showOverlayProgress = ["downloading", "downloaded", "installing"].includes(state.updateStatus.stage);
+
+  elements.updateOverlay.classList.toggle("hidden", !shouldShow);
+  elements.updateOverlayProgress.classList.toggle("hidden", !showOverlayProgress);
+  elements.updateOverlayProgressFill.style.width = `${state.updateStatus.downloaded ? 100 : progressPercent}%`;
+  elements.updateOverlayProgressLabel.textContent = state.updateStatus.downloaded ? "100%" : `${progressPercent}%`;
+
+  if (isStartupChecking) {
+    if (state.updateStatus.stage === "available" || state.updateStatus.stage === "downloading") {
+      elements.updateOverlayTitle.textContent = "正在下載更新";
+      elements.updateOverlayMessage.textContent = `正在下載新版本 ${state.updateStatus.latestVersion || ""}，目前進度 ${progressPercent}%。`;
+      return;
+    }
+
+    if (state.updateStatus.stage === "downloaded") {
+      elements.updateOverlayTitle.textContent = "更新已下載完成";
+      elements.updateOverlayMessage.textContent = `新版本 ${state.updateStatus.latestVersion || ""} 已下載完成，系統即將自動重新啟動套用。`;
+      return;
+    }
+
+    elements.updateOverlayTitle.textContent = "正在檢查更新";
+    elements.updateOverlayMessage.textContent = "請稍候，正在確認目前是否有可用的新版本。";
+    return;
+  }
+
+  if (isInstalling) {
+    elements.updateOverlayTitle.textContent = "正在套用更新";
+    elements.updateOverlayMessage.textContent = state.updateStatus.message || "請稍候，桌面版將自動重新啟動。";
+  }
 }
 
 function setActiveView(viewName) {
@@ -358,8 +407,11 @@ window.hanBurger.onUpdateStatus((payload) => {
     ...payload,
     currentVersion: payload.currentVersion || state.appVersion || state.updateStatus.currentVersion || "-",
     latestVersion: payload.latestVersion || state.updateStatus.latestVersion || payload.currentVersion || state.appVersion || "-",
+    progressPercent: payload.progressPercent ?? state.updateStatus.progressPercent ?? 0,
+    startupFlow: payload.startupFlow ?? false,
     downloaded: Boolean(payload.downloaded)
   };
+
   renderUpdateStatus();
 });
 

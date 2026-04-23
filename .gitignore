@@ -6,3 +6,4 @@ coverage/
 app-data/
 build/runtime-config/
 .env
+.codex/

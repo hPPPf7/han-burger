@@ -49,11 +49,18 @@
         </aside>
 
         <main class="content">
-          <div id="update-install-overlay" class="update-install-overlay hidden" aria-live="polite">
-            <div class="update-install-card">
-              <div class="eyebrow">Updating</div>
-              <h2>正在套用更新</h2>
-              <p id="update-install-message">請稍候，桌面版將自動重新啟動。</p>
+          <div id="update-overlay" class="update-overlay hidden" aria-live="polite">
+            <div class="update-overlay-card">
+              <div class="eyebrow">System</div>
+              <div class="update-overlay-spinner" aria-hidden="true"></div>
+              <h2 id="update-overlay-title">正在檢查更新</h2>
+              <p id="update-overlay-message">請稍候，正在確認目前是否有可用的新版本。</p>
+              <div id="update-overlay-progress" class="update-progress hidden" aria-hidden="true">
+                <div class="update-progress-track">
+                  <div id="update-overlay-progress-fill" class="update-progress-fill"></div>
+                </div>
+                <div id="update-overlay-progress-label" class="update-progress-label">0%</div>
+              </div>
             </div>
           </div>
 
@@ -182,6 +189,12 @@
                 <div class="eyebrow">Update</div>
                 <h3>桌面版更新</h3>
                 <p id="update-detail">啟動後會自動檢查新版本，下載完成後可直接重新啟動套用更新。</p>
+                <div id="update-progress" class="update-progress hidden" aria-hidden="true">
+                  <div class="update-progress-track">
+                    <div id="update-progress-fill" class="update-progress-fill"></div>
+                  </div>
+                  <div id="update-progress-label" class="update-progress-label">0%</div>
+                </div>
               </div>
               <button id="restart-update-button" class="primary-button hidden">重新啟動並更新</button>
             </div>
