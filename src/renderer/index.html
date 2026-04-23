@@ -35,6 +35,11 @@
             <div class="eyebrow">Han Burger</div>
             <h1>Desktop Hub</h1>
             <p>桌面端集中管理所有專案，手機端則維持各專案獨立發佈。</p>
+            <button id="home-button" class="sidebar-home-button" title="首頁" aria-label="首頁">
+              <svg viewBox="0 0 24 24" aria-hidden="true">
+                <path d="M4 11.8 12 5l8 6.8v7.7a1.5 1.5 0 0 1-1.5 1.5h-4.2v-5.4h-4.6V21H5.5A1.5 1.5 0 0 1 4 19.5Z" />
+              </svg>
+            </button>
           </div>
 
           <div id="project-list" class="project-list sidebar-project-list"></div>
@@ -199,34 +204,42 @@
               <button id="restart-update-button" class="primary-button hidden">重新啟動並更新</button>
             </div>
 
-            <div class="project-detail project-detail-standalone">
+            <section class="installed-projects-panel">
               <div class="panel-head">
                 <div>
-                  <div class="eyebrow">Selected Project</div>
-                  <h3 id="selected-project-name">尚未選取專案</h3>
-                </div>
-                <button id="remove-project-button" class="danger-button">移除選取專案</button>
-              </div>
-
-              <p id="selected-project-description">
-                左側選取一個專案後，這裡可以放更新、快取、入口與版本資訊。
-              </p>
-
-              <div class="page-grid page-grid-single">
-                <div class="status-card">
-                  <span class="status-label">儲存位置</span>
-                  <strong id="selected-project-path"></strong>
-                </div>
-                <div class="status-card">
-                  <span class="status-label">桌面版</span>
-                  <strong id="selected-project-desktop"></strong>
-                </div>
-                <div class="status-card">
-                  <span class="status-label">手機版</span>
-                  <strong id="selected-project-mobile"></strong>
+                  <div class="eyebrow">Installed Projects</div>
+                  <h3>已安裝專案</h3>
                 </div>
               </div>
-            </div>
+              <div id="installed-projects-list" class="installed-projects-list"></div>
+            </section>
+          </article>
+
+          <article id="project-view" class="page-view project-page hidden">
+            <section id="project-intro" class="project-intro">
+              <div class="eyebrow">Project</div>
+              <h2 id="project-view-title">Han Burger Watch</h2>
+              <p id="project-view-copy">影視紀錄桌面版首頁。安裝後才能進入並納入後續專案更新檢查。</p>
+              <div class="project-intro-actions">
+                <button id="project-view-action-button" class="primary-button">安裝專案</button>
+              </div>
+              <div class="project-inline-meta">
+                <div>
+                  <span>安裝狀態</span>
+                  <strong id="project-view-installed">尚未安裝</strong>
+                </div>
+                <div>
+                  <span>專案更新</span>
+                  <strong id="project-view-updates">未安裝時會略過更新檢查</strong>
+                </div>
+              </div>
+            </section>
+            <iframe
+              id="project-frame"
+              class="project-frame"
+              title="Project Homepage"
+              sandbox="allow-scripts"
+            ></iframe>
           </article>
         </main>
       </div>

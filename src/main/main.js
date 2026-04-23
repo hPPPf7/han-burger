@@ -1,8 +1,10 @@
 const fs = require("node:fs");
 const path = require("node:path");
+const { pathToFileURL } = require("node:url");
 const { app, BrowserWindow, ipcMain, Notification } = require("electron");
 const { initializeStorage } = require("./paths");
 const { createStore } = require("./store");
+const { ensureProjectDirectories, installProjectFiles, uninstallProjectFiles } = require("./project-manager");
 const { openGoogleSignIn } = require("./oauth");
 const { configureUpdater } = require("./updater");
 
@@ -12,10 +14,12 @@ let store;
 let updater;
 const APP_USER_MODEL_ID = "com.hanburger.desktop";
 
-function ensureProjectDirectories(projects) {
-  for (const project of projects) {
-    fs.mkdirSync(project.storagePath, { recursive: true });
+function sendToMainWindow(channel, payload) {
+  if (!mainWindow || mainWindow.isDestroyed()) {
+    return;
   }
+
+  mainWindow.webContents.send(channel, payload);
 }
 
 function createWindow() {
@@ -35,16 +39,14 @@ function createWindow() {
     }
   });
 
-  mainWindow.loadFile(path.join(__dirname, "..", "renderer", "index.html"));
-
   mainWindow.webContents.on("did-finish-load", async () => {
-    mainWindow.webContents.send("window-state-changed", {
+    sendToMainWindow("window-state-changed", {
       isMaximized: mainWindow.isMaximized()
     });
 
     const startupUpdateStatus = updater?.getStartupStatus?.();
     if (startupUpdateStatus) {
-      mainWindow.webContents.send("update-status", startupUpdateStatus);
+      sendToMainWindow("update-status", startupUpdateStatus);
 
       if (Notification.isSupported()) {
         new Notification({
@@ -60,13 +62,13 @@ function createWindow() {
   });
 
   mainWindow.on("maximize", () => {
-    mainWindow.webContents.send("window-state-changed", {
+    sendToMainWindow("window-state-changed", {
       isMaximized: true
     });
   });
 
   mainWindow.on("unmaximize", () => {
-    mainWindow.webContents.send("window-state-changed", {
+    sendToMainWindow("window-state-changed", {
       isMaximized: false
     });
   });
@@ -104,8 +106,48 @@ function getBootstrapData() {
   };
 }
 
+async function installProject(projectId) {
+  const projects = store.getProjects();
+  const nextProjects = await Promise.all(projects.map(async (project) => {
+    if (project.id !== projectId) {
+      return project;
+    }
+
+    const installResult = await installProjectFiles(project);
+
+    return {
+      ...project,
+      installed: true,
+      installedAt: new Date().toISOString(),
+      installedVersion: installResult.installedVersion || project.availableVersion || project.installedVersion || "0.1.0"
+    };
+  }));
+
+  store.saveProjects(nextProjects);
+}
+
 function registerIpc() {
   ipcMain.handle("bootstrap-data", async () => getBootstrapData());
+  ipcMain.handle("get-project-entry", async (_event, projectId) => {
+    const project = store.getProjects().find((item) => item.id === projectId);
+    if (!project?.entryFilePath) {
+      return null;
+    }
+
+    if (!fs.existsSync(project.entryFilePath)) {
+      return {
+        kind: "missing",
+        title: project.name,
+        html: null
+      };
+    }
+
+    return {
+      kind: "file",
+      title: project.name,
+      fileUrl: pathToFileURL(project.entryFilePath).toString()
+    };
+  });
 
   ipcMain.handle("sign-in-google", async () => {
     const config = store.getConfig();
@@ -114,40 +156,42 @@ function registerIpc() {
     store.saveUser(user);
 
     const payload = getBootstrapData();
-    mainWindow.webContents.send("auth-changed", payload);
+    sendToMainWindow("auth-changed", payload);
     return payload;
   });
 
   ipcMain.handle("sign-out", async () => {
     store.saveUser(null);
     const payload = getBootstrapData();
-    mainWindow.webContents.send("auth-changed", payload);
+    sendToMainWindow("auth-changed", payload);
     return payload;
   });
 
-  ipcMain.handle("install-project", async () => {
-    const projects = store.getProjects();
-    const nextIndex = projects.length + 1;
-    const id = `custom-project-${nextIndex}`;
-    const storagePath = path.join(appPaths.projectsRoot, id);
-
-    const nextProject = {
-      id,
-      name: `Custom Project ${nextIndex}`,
-      description: "示意專案。手機端請改走各專案獨立安裝，不跟桌面版綁在一起。",
-      storagePath,
-      desktopEnabled: true,
-      mobileDistributedSeparately: true
-    };
-
-    fs.mkdirSync(storagePath, { recursive: true });
-    store.saveProjects([...projects, nextProject]);
+  ipcMain.handle("install-project", async (_event, projectId) => {
+    await installProject(projectId);
     return getBootstrapData();
   });
 
   ipcMain.handle("remove-project", async (_event, projectId) => {
-    const projects = store.getProjects().filter((project) => project.id !== projectId);
-    store.saveProjects(projects);
+    const nextProjects = store.getProjects().map((project) => {
+      if (project.id !== projectId) {
+        return project;
+      }
+
+      return {
+        ...project,
+        installed: false,
+        installedAt: null,
+        installedVersion: null
+      };
+    });
+
+    const removedProject = nextProjects.find((project) => project.id === projectId);
+    if (removedProject) {
+      uninstallProjectFiles(removedProject);
+    }
+
+    store.saveProjects(nextProjects);
     return getBootstrapData();
   });
 
@@ -191,13 +235,15 @@ app.whenReady().then(() => {
   app.setAppUserModelId(APP_USER_MODEL_ID);
   appPaths = initializeStorage();
   store = createStore(appPaths);
-  createWindow();
-  updater = configureUpdater(mainWindow);
   registerIpc();
+  updater = configureUpdater(() => mainWindow);
+  createWindow();
+  mainWindow.loadFile(path.join(__dirname, "..", "renderer", "index.html"));
 
   app.on("activate", () => {
     if (BrowserWindow.getAllWindows().length === 0) {
       createWindow();
+      mainWindow.loadFile(path.join(__dirname, "..", "renderer", "index.html"));
     }
   });
 });

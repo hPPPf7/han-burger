@@ -26,14 +26,83 @@ function createStore(paths) {
     user: path.join(paths.configRoot, "user.json")
   };
 
-  function normalizeRelativeProjectPath(storagePath) {
-    if (!storagePath) {
-      return storagePath;
+  function isPathInsideRoot(rootPath, targetPath) {
+    const relativePath = path.relative(rootPath, targetPath);
+    return relativePath === "" || (!relativePath.startsWith("..") && !path.isAbsolute(relativePath));
+  }
+
+  function realpathIfExists(filePath) {
+    if (!fs.existsSync(filePath)) {
+      return null;
     }
 
-    return storagePath.startsWith("app-data/")
-      ? storagePath.slice("app-data/".length)
-      : storagePath;
+    return fs.realpathSync.native(filePath);
+  }
+
+  function resolvePathThroughExistingSegments(candidatePath) {
+    const resolvedCandidatePath = path.resolve(candidatePath);
+    const parsedPath = path.parse(resolvedCandidatePath);
+    const trailingSegments = [];
+    let currentPath = resolvedCandidatePath;
+
+    while (currentPath !== parsedPath.root && !fs.existsSync(currentPath)) {
+      trailingSegments.unshift(path.basename(currentPath));
+      currentPath = path.dirname(currentPath);
+    }
+
+    const canonicalBasePath = realpathIfExists(currentPath) || path.resolve(currentPath);
+    return trailingSegments.reduce(
+      (accumulator, segment) => path.join(accumulator, segment),
+      canonicalBasePath
+    );
+  }
+
+  function ensureManagedPath(rootPath, targetPath, label, projectId) {
+    const canonicalRootPath = resolvePathThroughExistingSegments(rootPath);
+    const canonicalTargetPath = resolvePathThroughExistingSegments(targetPath);
+
+    if (!isPathInsideRoot(canonicalRootPath, canonicalTargetPath)) {
+      throw new Error(`Invalid ${label} for project "${projectId}". It must stay within ${canonicalRootPath}.`);
+    }
+
+    return path.resolve(targetPath);
+  }
+
+  function normalizeRelativeDataPath(filePath) {
+    if (!filePath) {
+      return filePath;
+    }
+
+    const normalizedFilePath = filePath.replaceAll("\\", "/");
+    return normalizedFilePath.startsWith("app-data/")
+      ? normalizedFilePath.slice("app-data/".length)
+      : normalizedFilePath;
+  }
+
+  function resolveManagedPath(filePath, rootPath, label, projectId) {
+    if (!filePath) {
+      return filePath;
+    }
+
+    const candidatePath = path.isAbsolute(filePath)
+      ? path.resolve(filePath)
+      : path.resolve(paths.dataRoot, normalizeRelativeDataPath(filePath));
+
+    return ensureManagedPath(rootPath, candidatePath, label, projectId);
+  }
+
+  function relativizeDataPath(filePath, label, projectId) {
+    if (!filePath) {
+      return filePath;
+    }
+
+    const absolutePath = path.isAbsolute(filePath)
+      ? path.resolve(filePath)
+      : path.resolve(paths.dataRoot, normalizeRelativeDataPath(filePath));
+
+    const managedAbsolutePath = ensureManagedPath(paths.dataRoot, absolutePath, label, projectId);
+
+    return path.relative(paths.dataRoot, managedAbsolutePath).replaceAll("\\", "/");
   }
 
   function getConfig() {
@@ -68,16 +137,18 @@ function createStore(paths) {
     const projects = readJson(files.projects, []);
     return projects.map((project) => ({
       ...project,
-      storagePath: path.isAbsolute(project.storagePath)
-        ? project.storagePath
-        : path.join(paths.dataRoot, normalizeRelativeProjectPath(project.storagePath))
+      storagePath: resolveManagedPath(project.storagePath, paths.projectsRoot, "storagePath", project.id),
+      entryFilePath: resolveManagedPath(project.entryFilePath, paths.projectsRoot, "entryFilePath", project.id),
+      installSourcePath: resolveManagedPath(project.installSourcePath, paths.dataRoot, "installSourcePath", project.id)
     }));
   }
 
   function saveProjects(projects) {
     const relativeProjects = projects.map((project) => ({
       ...project,
-      storagePath: path.relative(paths.dataRoot, project.storagePath).replaceAll("\\", "/")
+      storagePath: relativizeDataPath(project.storagePath, "storagePath", project.id),
+      entryFilePath: relativizeDataPath(project.entryFilePath, "entryFilePath", project.id),
+      installSourcePath: relativizeDataPath(project.installSourcePath, "installSourcePath", project.id)
     }));
 
     writeJson(files.projects, relativeProjects);

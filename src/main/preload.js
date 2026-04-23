@@ -2,9 +2,10 @@ const { contextBridge, ipcRenderer } = require("electron");
 
 contextBridge.exposeInMainWorld("hanBurger", {
   getBootstrapData: () => ipcRenderer.invoke("bootstrap-data"),
+  getProjectEntry: (projectId) => ipcRenderer.invoke("get-project-entry", projectId),
   signInWithGoogle: () => ipcRenderer.invoke("sign-in-google"),
   signOut: () => ipcRenderer.invoke("sign-out"),
-  installProject: () => ipcRenderer.invoke("install-project"),
+  installProject: (projectId) => ipcRenderer.invoke("install-project", projectId),
   removeProject: (projectId) => ipcRenderer.invoke("remove-project", projectId),
   triggerUpdateCheck: () => ipcRenderer.invoke("trigger-update-check"),
   restartAndInstallUpdate: () => ipcRenderer.invoke("restart-and-install-update"),

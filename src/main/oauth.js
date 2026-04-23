@@ -6,6 +6,7 @@ const { shell } = require("electron");
 const GOOGLE_AUTH_URL = "https://accounts.google.com/o/oauth2/v2/auth";
 const GOOGLE_TOKEN_URL = "https://oauth2.googleapis.com/token";
 const GOOGLE_USERINFO_URL = "https://openidconnect.googleapis.com/v1/userinfo";
+const GOOGLE_SIGN_IN_TIMEOUT_MS = 120000;
 
 function renderCallbackPage() {
   return `<!doctype html>
@@ -157,6 +158,28 @@ async function openGoogleSignIn(config, paths) {
   shell.openExternal(authUrl.toString());
 
   const authorization = await new Promise((resolve, reject) => {
+    let settled = false;
+    const timeoutId = setTimeout(() => {
+      if (settled) {
+        return;
+      }
+
+      settled = true;
+      server.close();
+      reject(new Error("Google sign-in timed out. Please try again."));
+    }, GOOGLE_SIGN_IN_TIMEOUT_MS);
+
+    function finish(callback) {
+      if (settled) {
+        return;
+      }
+
+      settled = true;
+      clearTimeout(timeoutId);
+      server.close();
+      callback();
+    }
+
     server.on("request", (request, response) => {
       const requestUrl = new URL(request.url, "http://127.0.0.1");
       const returnedState = requestUrl.searchParams.get("state");
@@ -165,27 +188,28 @@ async function openGoogleSignIn(config, paths) {
 
       response.writeHead(200, { "Content-Type": "text/html; charset=utf-8" });
       response.end(renderCallbackPage());
-      server.close();
 
       if (error) {
-        reject(new Error(`Google sign-in failed: ${error}`));
+        finish(() => reject(new Error(`Google sign-in failed: ${error}`)));
         return;
       }
 
       if (returnedState !== state) {
-        reject(new Error("Google sign-in state mismatch."));
+        finish(() => reject(new Error("Google sign-in state mismatch.")));
         return;
       }
 
       if (!code) {
-        reject(new Error("Google sign-in did not return an authorization code."));
+        finish(() => reject(new Error("Google sign-in did not return an authorization code.")));
         return;
       }
 
-      resolve({ code, redirectUri });
+      finish(() => resolve({ code, redirectUri }));
     });
 
-    server.on("error", reject);
+    server.on("error", (error) => {
+      finish(() => reject(error));
+    });
   });
 
   const tokenParams = new URLSearchParams({

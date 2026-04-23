@@ -117,7 +117,7 @@ body {
   width: 10px;
   height: 10px;
   border-radius: 50%;
-  background: linear-gradient(135deg, var(--accent), var(--support));
+  background: var(--accent);
 }
 
 .titlebar-actions {
@@ -191,6 +191,39 @@ body {
 .brand-block p {
   margin-top: 10px;
   font-size: 13px;
+}
+
+.sidebar-home-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  min-height: 50px;
+  margin-top: 14px;
+  padding: 0 15px;
+  border: 1px solid transparent;
+  border-radius: 16px;
+  background: var(--surface-4);
+  color: var(--text);
+  cursor: pointer;
+  transition: transform 140ms ease, border-color 140ms ease, background 140ms ease;
+}
+
+.sidebar-home-button:hover {
+  transform: translateY(-1px);
+  border-color: var(--accent-border);
+  background: var(--accent-soft);
+}
+
+.sidebar-home-button.is-active {
+  border-color: var(--accent-border);
+  background: var(--accent-soft);
+}
+
+.sidebar-home-button svg {
+  width: 18px;
+  height: 18px;
+  fill: currentColor;
 }
 
 .brand-block h1,
@@ -345,7 +378,7 @@ body {
   width: 54px;
   height: 54px;
   border-radius: 50%;
-  background: linear-gradient(135deg, var(--accent), var(--support));
+  background: var(--accent);
   color: var(--accent-contrast);
   font-size: 22px;
   font-weight: 800;
@@ -371,6 +404,11 @@ body {
   min-width: 0;
   min-height: 0;
   overflow: auto;
+}
+
+.content.project-mode {
+  padding: 0;
+  overflow: hidden;
 }
 
 .update-overlay {
@@ -520,7 +558,7 @@ body {
   width: 84px;
   height: 84px;
   border-radius: 50%;
-  background: linear-gradient(135deg, var(--accent), var(--support));
+  background: var(--accent);
   color: var(--accent-contrast);
   font-size: 32px;
   font-weight: 800;
@@ -552,7 +590,7 @@ body {
 }
 
 .primary-button {
-  background: linear-gradient(135deg, var(--accent), var(--accent-strong));
+  background: var(--accent);
   color: var(--accent-contrast);
 }
 
@@ -582,6 +620,76 @@ body {
   border-radius: 24px;
   background: var(--surface-2);
   box-shadow: var(--shadow);
+}
+
+.project-page {
+  gap: 0;
+  width: 100%;
+  min-height: 100%;
+  margin: 0;
+}
+
+.project-intro {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  width: 100%;
+  min-height: 100%;
+  padding: 42px 44px;
+  background: var(--surface-2);
+}
+
+.project-intro h2 {
+  margin: 0;
+  font-size: clamp(34px, 5vw, 52px);
+  line-height: 1.04;
+}
+
+.project-intro p {
+  max-width: 760px;
+  margin: 0;
+  color: var(--muted);
+  font-size: 15px;
+  line-height: 1.8;
+}
+
+.project-intro-actions {
+  display: flex;
+  gap: 12px;
+}
+
+.project-inline-meta {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 18px;
+  max-width: 860px;
+  margin-top: 8px;
+}
+
+.project-inline-meta div {
+  padding: 18px 0 0;
+  border-top: 1px solid var(--border-subtle);
+}
+
+.project-inline-meta span {
+  display: block;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.project-inline-meta strong {
+  display: block;
+  margin-top: 8px;
+  font-size: 16px;
+  line-height: 1.6;
+}
+
+.project-frame {
+  width: 100%;
+  height: 100%;
+  min-height: 100%;
+  border: none;
+  background: #090b10;
 }
 
 .update-panel {
@@ -626,8 +734,52 @@ body {
   width: 0;
   height: 100%;
   border-radius: inherit;
-  background: linear-gradient(135deg, var(--accent), var(--accent-strong));
+  background: var(--accent);
   transition: width 180ms ease;
+}
+
+.installed-projects-panel {
+  padding: 24px;
+  border: 1px solid var(--border-subtle);
+  border-radius: 24px;
+  background: var(--surface-2);
+  box-shadow: var(--shadow);
+}
+
+.installed-projects-list {
+  display: grid;
+  gap: 12px;
+  margin-top: 18px;
+}
+
+.installed-project-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 16px 18px;
+  border-radius: 18px;
+  background: var(--surface-3);
+  border: 1px solid var(--border-subtle);
+}
+
+.installed-project-item strong,
+.installed-project-item span {
+  display: block;
+}
+
+.installed-project-item span {
+  margin-top: 6px;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.installed-project-empty {
+  padding: 18px;
+  border-radius: 18px;
+  background: var(--surface-3);
+  border: 1px solid var(--border-subtle);
+  color: var(--muted);
 }
 
 .update-progress-label {
@@ -663,5 +815,13 @@ body {
   .update-panel {
     grid-template-columns: 1fr;
     flex-direction: column;
+  }
+
+  .project-intro {
+    padding: 28px 22px;
+  }
+
+  .project-inline-meta {
+    grid-template-columns: 1fr;
   }
 }

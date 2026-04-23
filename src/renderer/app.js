@@ -2,6 +2,7 @@ const state = {
   projects: [],
   user: null,
   selectedProjectId: null,
+  loadedProjectEntries: {},
   paths: null,
   notes: null,
   theme: "dark",
@@ -16,9 +17,9 @@ const elements = {
   minimizeButton: document.getElementById("minimize-button"),
   maximizeButton: document.getElementById("maximize-button"),
   closeButton: document.getElementById("close-button"),
+  homeButton: document.getElementById("home-button"),
   userCard: document.getElementById("user-card"),
   projectList: document.getElementById("project-list"),
-  removeProjectButton: document.getElementById("remove-project-button"),
   googleLoginButton: document.getElementById("google-login-button"),
   checkUpdatesButton: document.getElementById("check-updates-button"),
   restartUpdateButton: document.getElementById("restart-update-button"),
@@ -26,6 +27,7 @@ const elements = {
   loginView: document.getElementById("login-view"),
   accountView: document.getElementById("account-view"),
   dashboardView: document.getElementById("dashboard-view"),
+  projectView: document.getElementById("project-view"),
   updateOverlay: document.getElementById("update-overlay"),
   updateOverlayTitle: document.getElementById("update-overlay-title"),
   updateOverlayMessage: document.getElementById("update-overlay-message"),
@@ -53,11 +55,14 @@ const elements = {
   updateProgress: document.getElementById("update-progress"),
   updateProgressFill: document.getElementById("update-progress-fill"),
   updateProgressLabel: document.getElementById("update-progress-label"),
-  selectedProjectName: document.getElementById("selected-project-name"),
-  selectedProjectDescription: document.getElementById("selected-project-description"),
-  selectedProjectPath: document.getElementById("selected-project-path"),
-  selectedProjectDesktop: document.getElementById("selected-project-desktop"),
-  selectedProjectMobile: document.getElementById("selected-project-mobile"),
+  installedProjectsList: document.getElementById("installed-projects-list"),
+  projectIntro: document.getElementById("project-intro"),
+  projectViewTitle: document.getElementById("project-view-title"),
+  projectViewCopy: document.getElementById("project-view-copy"),
+  projectViewActionButton: document.getElementById("project-view-action-button"),
+  projectViewInstalled: document.getElementById("project-view-installed"),
+  projectViewUpdates: document.getElementById("project-view-updates"),
+  projectFrame: document.getElementById("project-frame"),
   accountAvatar: document.getElementById("account-avatar"),
   accountName: document.getElementById("account-name"),
   accountEmail: document.getElementById("account-email"),
@@ -76,14 +81,22 @@ state.updateStatus = {
   message: "啟動時會自動檢查一次"
 };
 
+function formatVersion(version) {
+  if (!version || version === "-") {
+    return "-";
+  }
+
+  return version.startsWith("v") ? version : `v${version}`;
+}
+
 function renderVersionInfo() {
   const currentVersion = state.appVersion || state.updateStatus.currentVersion || "-";
   const latestVersion = state.updateStatus.latestVersion || currentVersion || "-";
 
-  elements.titlebarVersion.textContent = `v${currentVersion}`;
-  elements.loginCurrentVersion.textContent = `v${currentVersion}`;
-  elements.dashboardCurrentVersion.textContent = `v${currentVersion}`;
-  elements.dashboardLatestVersion.textContent = latestVersion === currentVersion ? `v${currentVersion}` : `v${latestVersion}`;
+  elements.titlebarVersion.textContent = formatVersion(currentVersion);
+  elements.loginCurrentVersion.textContent = formatVersion(currentVersion);
+  elements.dashboardCurrentVersion.textContent = formatVersion(currentVersion);
+  elements.dashboardLatestVersion.textContent = latestVersion === currentVersion ? formatVersion(currentVersion) : formatVersion(latestVersion);
 }
 
 function renderUpdateStatus() {
@@ -148,6 +161,10 @@ function setActiveView(viewName) {
   elements.loginView.classList.toggle("hidden", viewName !== "login");
   elements.accountView.classList.toggle("hidden", viewName !== "account");
   elements.dashboardView.classList.toggle("hidden", viewName !== "dashboard");
+  elements.projectView.classList.toggle("hidden", viewName !== "project");
+  document.querySelector(".content")?.classList.toggle("project-mode", viewName === "project");
+  elements.homeButton.classList.toggle("is-active", viewName === "dashboard" || viewName === "login");
+  renderProjectList();
 }
 
 function showLoginView() {
@@ -156,6 +173,86 @@ function showLoginView() {
 
 function showDashboardView() {
   setActiveView("dashboard");
+}
+
+async function showProjectView(project) {
+  elements.projectViewTitle.textContent = project.name;
+  elements.projectViewCopy.textContent = project.description || "目前正在查看專案首頁。";
+  elements.projectViewInstalled.textContent = project.installed
+    ? `已安裝${project.installedVersion ? ` · ${formatVersion(project.installedVersion)}` : ""}`
+    : "尚未安裝";
+  elements.projectViewUpdates.textContent = project.installed
+    ? "之後只會檢查已安裝專案的更新"
+    : "未安裝時會略過更新檢查";
+  elements.projectViewActionButton.textContent = project.installed ? "進入專案" : "安裝專案";
+  elements.projectViewActionButton.className = project.installed ? "primary-button" : "ghost-button";
+  elements.projectIntro.classList.toggle("hidden", project.installed);
+  elements.projectFrame.classList.toggle("hidden", !project.installed);
+
+  if (!project.installed) {
+    elements.projectFrame.removeAttribute("src");
+    elements.projectFrame.srcdoc = "";
+    setActiveView("project");
+    return;
+  }
+
+  let entry = state.loadedProjectEntries[project.id];
+  if (!entry) {
+    entry = await window.hanBurger.getProjectEntry(project.id);
+    state.loadedProjectEntries[project.id] = entry;
+  }
+
+  if (entry?.kind === "file" && entry.fileUrl) {
+    elements.projectFrame.removeAttribute("srcdoc");
+    elements.projectFrame.src = entry.fileUrl;
+  } else {
+    elements.projectFrame.removeAttribute("src");
+    elements.projectFrame.srcdoc = `
+      <!doctype html>
+      <html lang="zh-Hant">
+        <head>
+          <meta charset="UTF-8" />
+          <style>
+            body {
+              margin: 0;
+              display: grid;
+              place-items: center;
+              min-height: 100vh;
+              font-family: "Segoe UI", "Microsoft JhengHei UI", sans-serif;
+              background: #120f0d;
+              color: #f6efe5;
+            }
+            .empty-state {
+              width: min(480px, calc(100% - 48px));
+              padding: 28px;
+              border-radius: 24px;
+              background: rgba(255,255,255,0.04);
+              border: 1px solid rgba(255,255,255,0.08);
+            }
+            h1 { margin: 0 0 12px; font-size: 24px; }
+            p { margin: 0; line-height: 1.7; color: #bca998; }
+          </style>
+        </head>
+        <body>
+          <div class="empty-state">
+            <h1>${project.name}</h1>
+            <p>目前尚未準備好首頁檔案，請確認專案入口頁已建立。</p>
+          </div>
+        </body>
+      </html>
+    `;
+  }
+
+  setActiveView("project");
+}
+
+function showHomeView() {
+  if (state.user) {
+    showDashboardView();
+    return;
+  }
+
+  showLoginView();
 }
 
 function showAccountView() {
@@ -192,34 +289,60 @@ function renderProjectList() {
 
   state.projects.forEach((project) => {
     const button = document.createElement("button");
-    button.className = `project-item${project.id === state.selectedProjectId ? " is-selected" : ""}`;
-    button.innerHTML = `<strong>${project.name}</strong><span>${project.description}</span>`;
-    button.addEventListener("click", () => {
+    const isSelected = state.activeView === "project" && project.id === state.selectedProjectId;
+    button.className = `project-item${isSelected ? " is-selected" : ""}`;
+    button.innerHTML = `<strong>${project.name}</strong><span>${project.installed ? project.description : "尚未安裝，安裝後才能進入與更新。"}</span>`;
+    button.addEventListener("click", async () => {
       state.selectedProjectId = project.id;
       renderProjectList();
       renderSelectedProject();
+      await showProjectView(project);
     });
     elements.projectList.appendChild(button);
   });
 }
 
 function renderSelectedProject() {
-  const project = getSelectedProject();
+  return getSelectedProject();
+}
 
-  if (!project) {
-    elements.selectedProjectName.textContent = "尚未選取專案";
-    elements.selectedProjectDescription.textContent = "左側選取一個專案後，這裡可以放更新、快取、入口與版本資訊。";
-    elements.selectedProjectPath.textContent = "-";
-    elements.selectedProjectDesktop.textContent = "-";
-    elements.selectedProjectMobile.textContent = "-";
+function renderInstalledProjects() {
+  const installedProjects = state.projects.filter((project) => project.installed);
+  elements.installedProjectsList.innerHTML = "";
+
+  if (installedProjects.length === 0) {
+    const emptyState = document.createElement("div");
+    emptyState.className = "installed-project-empty";
+    emptyState.textContent = "目前沒有已安裝專案。";
+    elements.installedProjectsList.appendChild(emptyState);
     return;
   }
 
-  elements.selectedProjectName.textContent = project.name;
-  elements.selectedProjectDescription.textContent = project.description;
-  elements.selectedProjectPath.textContent = project.storagePath;
-  elements.selectedProjectDesktop.textContent = project.desktopEnabled ? "由桌面版統一承載" : "未提供";
-  elements.selectedProjectMobile.textContent = project.mobileDistributedSeparately ? "需單獨下載安裝" : "與桌面共用";
+  installedProjects.forEach((project) => {
+    const item = document.createElement("div");
+    item.className = "installed-project-item";
+    item.innerHTML = `
+      <div>
+        <strong>${project.name}</strong>
+        <span>${project.installedVersion ? `目前版本 ${formatVersion(project.installedVersion)}` : "已安裝"}</span>
+      </div>
+    `;
+
+    const deleteButton = document.createElement("button");
+    deleteButton.className = "danger-button";
+    deleteButton.textContent = "刪除專案";
+    deleteButton.addEventListener("click", async () => {
+      const payload = await window.hanBurger.removeProject(project.id);
+      if (state.selectedProjectId === project.id) {
+        state.selectedProjectId = null;
+        showDashboardView();
+      }
+      applyBootstrap(payload);
+    });
+
+    item.appendChild(deleteButton);
+    elements.installedProjectsList.appendChild(item);
+  });
 }
 
 function renderUser() {
@@ -247,9 +370,9 @@ function renderUser() {
   elements.userEmail.textContent = state.user.email;
   elements.avatar.textContent = state.user.name?.slice(0, 1)?.toUpperCase() || "G";
   if (state.user.avatarUrl) {
-    elements.avatar.style.backgroundImage = `linear-gradient(rgba(0,0,0,0.15), rgba(0,0,0,0.15)), url("${state.user.avatarUrl}")`;
+    elements.avatar.style.backgroundImage = `url("${state.user.avatarUrl}")`;
     elements.avatar.style.color = "transparent";
-    elements.accountAvatar.style.backgroundImage = `linear-gradient(rgba(0,0,0,0.15), rgba(0,0,0,0.15)), url("${state.user.avatarUrl}")`;
+    elements.accountAvatar.style.backgroundImage = `url("${state.user.avatarUrl}")`;
     elements.accountAvatar.style.color = "transparent";
   } else {
     elements.avatar.style.backgroundImage = "";
@@ -293,6 +416,7 @@ function renderAll(config) {
 
   renderProjectList();
   renderSelectedProject();
+  renderInstalledProjects();
   renderUser();
   renderMeta(config);
 }
@@ -342,17 +466,46 @@ elements.googleLoginButton.addEventListener("click", async () => {
   await startGoogleLogin();
 });
 
-elements.removeProjectButton.addEventListener("click", async () => {
-  if (!state.selectedProjectId) {
+elements.projectViewActionButton.addEventListener("click", async () => {
+  const project = getSelectedProject();
+  if (!project) {
     return;
   }
 
-  const payload = await window.hanBurger.removeProject(state.selectedProjectId);
-  applyBootstrap(payload);
+  if (project.installed && project.entryFilePath) {
+    await showProjectView(project);
+    return;
+  }
+
+  elements.projectViewActionButton.disabled = true;
+  elements.projectViewActionButton.textContent = "安裝中...";
+  let installSucceeded = false;
+
+  try {
+    const payload = await window.hanBurger.installProject(project.id);
+    state.loadedProjectEntries[project.id] = null;
+    applyBootstrap(payload);
+    const nextProject = payload.projects.find((item) => item.id === project.id);
+    if (nextProject) {
+      await showProjectView(nextProject);
+    }
+    installSucceeded = true;
+  } catch (error) {
+    elements.updateStatus.textContent = `安裝失敗: ${error.message}`;
+  } finally {
+    elements.projectViewActionButton.disabled = false;
+    if (!installSucceeded) {
+      elements.projectViewActionButton.textContent = project.installed ? "進入專案" : "安裝專案";
+    }
+  }
 });
 
 elements.checkUpdatesButton.addEventListener("click", async () => {
   await window.hanBurger.triggerUpdateCheck();
+});
+
+elements.homeButton.addEventListener("click", () => {
+  showHomeView();
 });
 
 elements.restartUpdateButton.addEventListener("click", async () => {

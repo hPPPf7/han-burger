@@ -61,7 +61,7 @@ function writePendingUpdateMarker(targetVersion) {
   );
 }
 
-function configureUpdater(mainWindow) {
+function configureUpdater(getMainWindow) {
   if (!app.isPackaged) {
     return {
       enabled: false,
@@ -87,6 +87,11 @@ function configureUpdater(mainWindow) {
   const startupStatus = readAppliedUpdateStatus();
 
   function emitUpdateStatus(payload) {
+    const mainWindow = getMainWindow?.();
+    if (!mainWindow || mainWindow.isDestroyed()) {
+      return;
+    }
+
     mainWindow.webContents.send("update-status", {
       startupFlow: startupFlowActive,
       ...payload
