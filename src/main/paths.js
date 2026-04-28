@@ -15,6 +15,14 @@ function readJsonSafe(filePath) {
   }
 }
 
+function readTextSafe(filePath) {
+  try {
+    return fs.readFileSync(filePath, "utf8").trim();
+  } catch {
+    return "";
+  }
+}
+
 function syncConfigFromTemplate(appConfigPath, configTemplatePath) {
   if (!fs.existsSync(configTemplatePath)) {
     return;
@@ -74,6 +82,17 @@ function getExecutableRoot() {
 function getDataRoot(executableRoot) {
   if (!app.isPackaged) {
     return path.join(executableRoot, "app-data");
+  }
+
+  const dataRootPath = readTextSafe(path.join(app.getPath("userData"), "data-root.txt"));
+  if (dataRootPath) {
+    return path.resolve(dataRootPath);
+  }
+
+  const dataRootConfigPath = path.join(app.getPath("userData"), "data-root.json");
+  const dataRootConfig = readJsonSafe(dataRootConfigPath);
+  if (typeof dataRootConfig?.dataRoot === "string" && dataRootConfig.dataRoot.trim()) {
+    return path.resolve(dataRootConfig.dataRoot);
   }
 
   return path.join(app.getPath("userData"), "app-data");

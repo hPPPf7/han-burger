@@ -1,6 +1,6 @@
 {
   "name": "han-burger-desktop",
-  "version": "0.1.10",
+  "version": "0.1.11",
   "description": "Han Burger desktop shell with Google sign-in, project launcher, local storage, and auto-update scaffolding.",
   "main": "src/main/main.js",
   "author": "OpenAI Codex",
@@ -37,9 +37,13 @@
     },
     "nsis": {
       "artifactName": "Han-Burger-Desktop-${version}-setup.${ext}",
-      "oneClick": true,
+      "oneClick": false,
       "perMachine": false,
-      "allowToChangeInstallationDirectory": false
+      "allowToChangeInstallationDirectory": true,
+      "installerHeader": "build/installerHeader.bmp",
+      "installerSidebar": "build/installerSidebar.bmp",
+      "uninstallerSidebar": "build/installerSidebar.bmp",
+      "include": "build/installer.nsh"
     },
     "publish": [
       {

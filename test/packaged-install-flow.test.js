@@ -116,3 +116,39 @@ test("packaged initializeStorage seeds han-burger-watch metadata and supports Gi
 
   fs.rmSync(tempRoot, { recursive: true, force: true });
 });
+
+test("packaged initializeStorage uses configured project data folder", () => {
+  const tempRoot = createTempRoot();
+  const fakeExeDir = path.join(tempRoot, "dist");
+  const fakeExePath = path.join(fakeExeDir, "Han Burger Desktop.exe");
+  const fakeUserData = path.join(tempRoot, "user-data");
+  const customDataRoot = path.join(tempRoot, "custom-project-data");
+
+  fs.mkdirSync(fakeExeDir, { recursive: true });
+  fs.mkdirSync(fakeUserData, { recursive: true });
+  fs.writeFileSync(fakeExePath, "", "utf8");
+  fs.writeFileSync(path.join(fakeUserData, "data-root.txt"), customDataRoot, "utf8");
+
+  const mockApp = {
+    isPackaged: true,
+    getPath(name) {
+      if (name === "exe") {
+        return fakeExePath;
+      }
+
+      if (name === "userData") {
+        return fakeUserData;
+      }
+
+      throw new Error(`Unexpected getPath(${name})`);
+    }
+  };
+
+  const appPaths = withMockedElectronApp(mockApp, ({ initializeStorage }) => initializeStorage());
+
+  assert.equal(appPaths.dataRoot, customDataRoot);
+  assert.equal(fs.existsSync(path.join(customDataRoot, "config")), true);
+  assert.equal(fs.existsSync(path.join(customDataRoot, "projects")), true);
+
+  fs.rmSync(tempRoot, { recursive: true, force: true });
+});
