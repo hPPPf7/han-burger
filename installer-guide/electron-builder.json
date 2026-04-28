@@ -1,0 +1,29 @@
+{
+  "appId": "com.hanburger.installer",
+  "productName": "Han Burger Installer",
+  "directories": {
+    "output": "dist/first-installer"
+  },
+  "files": [
+    "installer-guide/**/*"
+  ],
+  "extraMetadata": {
+    "name": "han-burger-installer",
+    "version": "0.1.15",
+    "main": "installer-guide/main.js"
+  },
+  "win": {
+    "signAndEditExecutable": false,
+    "target": [
+      {
+        "target": "portable",
+        "arch": [
+          "x64"
+        ]
+      }
+    ]
+  },
+  "portable": {
+    "artifactName": "Han-Burger-Installer-${version}.${ext}"
+  }
+}

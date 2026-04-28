@@ -15,6 +15,7 @@
     "installer:preview": "electron installer-guide",
     "test": "node --test",
     "build": "node scripts/prepare-runtime-config.js && electron-builder --win nsis",
+    "build:first-installer": "electron-builder --config installer-guide/electron-builder.json",
     "build:dir": "electron-builder --win dir",
     "release:github": "node scripts/prepare-runtime-config.js && electron-builder --win nsis --publish always",
     "postinstall": "electron-builder install-app-deps"
