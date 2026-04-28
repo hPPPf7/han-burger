@@ -5,7 +5,14 @@ const os = require("node:os");
 const path = require("node:path");
 const { ReadableStream } = require("node:stream/web");
 
-const { ensureProjectDirectories, installProjectFiles, uninstallProjectFiles } = require("../src/main/project-manager");
+const {
+  compareVersions,
+  ensureProjectDirectories,
+  installProjectFiles,
+  isReleaseNewerThanInstalled,
+  uninstallProjectFiles,
+  updateInstalledProjectFiles
+} = require("../src/main/project-manager");
 
 function createTempDir() {
   return fs.mkdtempSync(path.join(os.tmpdir(), "han-burger-project-manager-"));
@@ -151,6 +158,131 @@ test("installProjectFiles rejects release payloads missing the configured entry 
   );
 
   assert.equal(fs.existsSync(storagePath), false);
+
+  fs.rmSync(tempRoot, { recursive: true, force: true });
+});
+
+test("version comparison handles v-prefixed release tags", () => {
+  assert.equal(compareVersions("v1.2.3", "1.2.2"), 1);
+  assert.equal(compareVersions("v1.2.3", "1.2.3"), 0);
+  assert.equal(compareVersions("v1.2.3", "1.3.0"), -1);
+  assert.equal(isReleaseNewerThanInstalled("v1.2.3", "v1.2.2"), true);
+  assert.equal(isReleaseNewerThanInstalled("v1.2.3", "v1.2.3"), false);
+});
+
+test("updateInstalledProjectFiles skips download when installed release is current", async () => {
+  const tempRoot = createTempDir();
+  const storagePath = path.join(tempRoot, "projects", "watch");
+  const fetchCalls = [];
+
+  const result = await updateInstalledProjectFiles({
+    id: "han-burger-watch",
+    installed: true,
+    installedVersion: "v1.2.3",
+    storagePath,
+    entryFilePath: path.join(storagePath, "index.html"),
+    updateFeed: {
+      provider: "github",
+      owner: "hPPPf7",
+      repo: "han-burger-watch",
+      assetName: "han-burger-watch.zip"
+    }
+  }, {
+    fetchImpl: async (url) => {
+      fetchCalls.push(String(url));
+      return {
+        ok: true,
+        async json() {
+          return {
+            tag_name: "v1.2.3",
+            assets: [
+              {
+                name: "han-burger-watch.zip",
+                browser_download_url: "https://example.test/han-burger-watch.zip"
+              }
+            ]
+          };
+        }
+      };
+    },
+    execFileImpl: async () => {
+      throw new Error("extract should not run");
+    },
+    tempRoot: path.join(tempRoot, "temp")
+  });
+
+  assert.equal(result.updated, false);
+  assert.deepEqual(fetchCalls, [
+    "https://api.github.com/repos/hPPPf7/han-burger-watch/releases/latest"
+  ]);
+
+  fs.rmSync(tempRoot, { recursive: true, force: true });
+});
+
+test("updateInstalledProjectFiles downloads newer GitHub release", async () => {
+  const tempRoot = createTempDir();
+  const storagePath = path.join(tempRoot, "projects", "watch");
+  const fetchCalls = [];
+
+  fs.mkdirSync(storagePath, { recursive: true });
+  fs.writeFileSync(path.join(storagePath, "index.html"), "<h1>old</h1>\n", "utf8");
+
+  const result = await updateInstalledProjectFiles({
+    id: "han-burger-watch",
+    installed: true,
+    installedVersion: "v1.2.2",
+    storagePath,
+    entryFilePath: path.join(storagePath, "index.html"),
+    updateFeed: {
+      provider: "github",
+      owner: "hPPPf7",
+      repo: "han-burger-watch",
+      assetName: "han-burger-watch.zip"
+    }
+  }, {
+    fetchImpl: async (url) => {
+      fetchCalls.push(String(url));
+
+      if (String(url).includes("/releases/latest")) {
+        return {
+          ok: true,
+          async json() {
+            return {
+              tag_name: "v1.2.3",
+              assets: [
+                {
+                  name: "han-burger-watch.zip",
+                  browser_download_url: "https://example.test/han-burger-watch.zip"
+                }
+              ]
+            };
+          }
+        };
+      }
+
+      return {
+        ok: true,
+        body: new ReadableStream({
+          start(controller) {
+            controller.enqueue(new TextEncoder().encode("zip-binary"));
+            controller.close();
+          }
+        })
+      };
+    },
+    execFileImpl: async () => {
+      fs.writeFileSync(path.join(storagePath, "index.html"), "<h1>new</h1>\n", "utf8");
+    },
+    tempRoot: path.join(tempRoot, "temp")
+  });
+
+  assert.equal(result.updated, true);
+  assert.equal(result.installedVersion, "v1.2.3");
+  assert.deepEqual(fetchCalls, [
+    "https://api.github.com/repos/hPPPf7/han-burger-watch/releases/latest",
+    "https://example.test/han-burger-watch.zip"
+  ]);
+  assert.equal(fs.readFileSync(path.join(storagePath, "index.html"), "utf8"), "<h1>new</h1>\n");
 
   fs.rmSync(tempRoot, { recursive: true, force: true });
 });

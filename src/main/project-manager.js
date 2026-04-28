@@ -67,12 +67,58 @@ async function fetchGithubReleaseAsset(project, fetchImpl = fetch) {
   };
 }
 
+function normalizeVersionParts(version) {
+  return String(version || "")
+    .trim()
+    .replace(/^v/i, "")
+    .split(/[.-]/)
+    .map((part) => {
+      const value = Number.parseInt(part, 10);
+      return Number.isFinite(value) ? value : part;
+    });
+}
+
+function compareVersions(leftVersion, rightVersion) {
+  const left = normalizeVersionParts(leftVersion);
+  const right = normalizeVersionParts(rightVersion);
+  const length = Math.max(left.length, right.length);
+
+  for (let index = 0; index < length; index += 1) {
+    const leftPart = left[index] ?? 0;
+    const rightPart = right[index] ?? 0;
+
+    if (leftPart === rightPart) {
+      continue;
+    }
+
+    if (typeof leftPart === "number" && typeof rightPart === "number") {
+      return leftPart > rightPart ? 1 : -1;
+    }
+
+    return String(leftPart).localeCompare(String(rightPart));
+  }
+
+  return 0;
+}
+
+function isReleaseNewerThanInstalled(releaseVersion, installedVersion) {
+  if (!releaseVersion) {
+    return false;
+  }
+
+  if (!installedVersion) {
+    return true;
+  }
+
+  return compareVersions(releaseVersion, installedVersion) > 0;
+}
+
 async function installProjectFromGithubRelease(project, options = {}) {
   const fetchImpl = options.fetchImpl || fetch;
   const execFileImpl = options.execFileImpl || execFileAsync;
   const tempRoot = options.tempRoot || fs.mkdtempSync(path.join(os.tmpdir(), `han-burger-${project.id}-`));
   const archivePath = path.join(tempRoot, `${project.id}.zip`);
-  const releaseAsset = await fetchGithubReleaseAsset(project, fetchImpl);
+  const releaseAsset = options.releaseAsset || await fetchGithubReleaseAsset(project, fetchImpl);
 
   const assetResponse = await fetchImpl(releaseAsset.downloadUrl, {
     headers: {
@@ -105,6 +151,37 @@ async function installProjectFromGithubRelease(project, options = {}) {
 
   return {
     installedVersion: releaseAsset.version
+  };
+}
+
+async function updateInstalledProjectFiles(project, options = {}) {
+  if (!project.installed || project.updateFeed?.provider !== "github") {
+    return {
+      updated: false,
+      installedVersion: project.installedVersion || null
+    };
+  }
+
+  const fetchImpl = options.fetchImpl || fetch;
+  const releaseAsset = await fetchGithubReleaseAsset(project, fetchImpl);
+
+  if (!isReleaseNewerThanInstalled(releaseAsset.version, project.installedVersion)) {
+    return {
+      updated: false,
+      installedVersion: project.installedVersion || releaseAsset.version,
+      latestVersion: releaseAsset.version
+    };
+  }
+
+  const installResult = await installProjectFromGithubRelease(project, {
+    ...options,
+    releaseAsset
+  });
+
+  return {
+    updated: true,
+    installedVersion: installResult.installedVersion,
+    latestVersion: releaseAsset.version
   };
 }
 
@@ -163,8 +240,11 @@ function uninstallProjectFiles(project) {
 
 module.exports = {
   ensureProjectDirectories,
+  compareVersions,
   fetchGithubReleaseAsset,
   installProjectFiles,
   installProjectFromGithubRelease,
+  isReleaseNewerThanInstalled,
+  updateInstalledProjectFiles,
   uninstallProjectFiles
 };

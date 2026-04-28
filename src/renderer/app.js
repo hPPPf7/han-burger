@@ -554,6 +554,17 @@ window.hanBurger.onAuthChanged((payload) => {
   applyBootstrap(payload);
 });
 
+window.hanBurger.onProjectsChanged((payload) => {
+  state.loadedProjectEntries = {};
+  applyBootstrap(payload);
+});
+
+window.hanBurger.onProjectUpdateStatus((payload) => {
+  if (payload?.message) {
+    elements.updateStatus.textContent = payload.message;
+  }
+});
+
 window.hanBurger.onUpdateStatus((payload) => {
   state.updateStatus = {
     ...state.updateStatus,

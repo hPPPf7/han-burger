@@ -4,7 +4,12 @@ const { pathToFileURL } = require("node:url");
 const { app, BrowserWindow, ipcMain, Notification } = require("electron");
 const { initializeStorage } = require("./paths");
 const { createStore } = require("./store");
-const { ensureProjectDirectories, installProjectFiles, uninstallProjectFiles } = require("./project-manager");
+const {
+  ensureProjectDirectories,
+  installProjectFiles,
+  uninstallProjectFiles,
+  updateInstalledProjectFiles
+} = require("./project-manager");
 const { openGoogleSignIn } = require("./oauth");
 const { configureUpdater } = require("./updater");
 
@@ -59,6 +64,14 @@ function createWindow() {
     if (updater) {
       await updater.checkForStartupUpdates();
     }
+
+    updateInstalledProjects().catch((error) => {
+      sendToMainWindow("project-update-status", {
+        projectId: null,
+        stage: "error",
+        message: `專案更新檢查失敗: ${error.message}`
+      });
+    });
   });
 
   mainWindow.on("maximize", () => {
@@ -126,9 +139,98 @@ async function installProject(projectId) {
   store.saveProjects(nextProjects);
 }
 
+async function updateInstalledProject(projectId) {
+  const projects = store.getProjects();
+  let didUpdate = false;
+  let didCheck = false;
+
+  const nextProjects = await Promise.all(projects.map(async (project) => {
+    if (project.id !== projectId || !project.installed) {
+      return project;
+    }
+
+    didCheck = true;
+    const updateResult = await updateInstalledProjectFiles(project);
+
+    if (!updateResult.updated) {
+      return project;
+    }
+
+    didUpdate = true;
+    return {
+      ...project,
+      installed: true,
+      installedAt: project.installedAt || new Date().toISOString(),
+      installedVersion: updateResult.installedVersion || project.installedVersion
+    };
+  }));
+
+  if (didUpdate) {
+    store.saveProjects(nextProjects);
+    sendToMainWindow("projects-changed", getBootstrapData());
+  }
+
+  return {
+    checked: didCheck,
+    updated: didUpdate
+  };
+}
+
+async function updateInstalledProjects() {
+  const projects = store.getProjects();
+  let didUpdate = false;
+
+  const nextProjects = await Promise.all(projects.map(async (project) => {
+    if (!project.installed) {
+      return project;
+    }
+
+    try {
+      const updateResult = await updateInstalledProjectFiles(project);
+      if (!updateResult.updated) {
+        return project;
+      }
+
+      didUpdate = true;
+      return {
+        ...project,
+        installed: true,
+        installedAt: project.installedAt || new Date().toISOString(),
+        installedVersion: updateResult.installedVersion || project.installedVersion
+      };
+    } catch (error) {
+      sendToMainWindow("project-update-status", {
+        projectId: project.id,
+        stage: "error",
+        message: `專案更新檢查失敗: ${error.message}`
+      });
+      return project;
+    }
+  }));
+
+  if (didUpdate) {
+    store.saveProjects(nextProjects);
+    sendToMainWindow("projects-changed", getBootstrapData());
+  }
+
+  return {
+    updated: didUpdate
+  };
+}
+
 function registerIpc() {
   ipcMain.handle("bootstrap-data", async () => getBootstrapData());
   ipcMain.handle("get-project-entry", async (_event, projectId) => {
+    try {
+      await updateInstalledProject(projectId);
+    } catch (error) {
+      sendToMainWindow("project-update-status", {
+        projectId,
+        stage: "error",
+        message: `專案更新檢查失敗，已改用本機版本: ${error.message}`
+      });
+    }
+
     const project = store.getProjects().find((item) => item.id === projectId);
     if (!project?.entryFilePath) {
       return null;
@@ -169,6 +271,11 @@ function registerIpc() {
 
   ipcMain.handle("install-project", async (_event, projectId) => {
     await installProject(projectId);
+    return getBootstrapData();
+  });
+
+  ipcMain.handle("update-installed-projects", async () => {
+    await updateInstalledProjects();
     return getBootstrapData();
   });
 

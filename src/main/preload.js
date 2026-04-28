@@ -6,6 +6,7 @@ contextBridge.exposeInMainWorld("hanBurger", {
   signInWithGoogle: () => ipcRenderer.invoke("sign-in-google"),
   signOut: () => ipcRenderer.invoke("sign-out"),
   installProject: (projectId) => ipcRenderer.invoke("install-project", projectId),
+  updateInstalledProjects: () => ipcRenderer.invoke("update-installed-projects"),
   removeProject: (projectId) => ipcRenderer.invoke("remove-project", projectId),
   triggerUpdateCheck: () => ipcRenderer.invoke("trigger-update-check"),
   restartAndInstallUpdate: () => ipcRenderer.invoke("restart-and-install-update"),
@@ -13,6 +14,8 @@ contextBridge.exposeInMainWorld("hanBurger", {
   maximizeWindow: () => ipcRenderer.invoke("window-maximize"),
   closeWindow: () => ipcRenderer.invoke("window-close"),
   onAuthChanged: (callback) => ipcRenderer.on("auth-changed", (_event, payload) => callback(payload)),
+  onProjectsChanged: (callback) => ipcRenderer.on("projects-changed", (_event, payload) => callback(payload)),
+  onProjectUpdateStatus: (callback) => ipcRenderer.on("project-update-status", (_event, payload) => callback(payload)),
   onUpdateStatus: (callback) => ipcRenderer.on("update-status", (_event, payload) => callback(payload)),
   onWindowStateChanged: (callback) => ipcRenderer.on("window-state-changed", (_event, payload) => callback(payload))
 });
