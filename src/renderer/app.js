@@ -8,7 +8,9 @@ const state = {
   theme: "dark",
   isMaximized: false,
   activeView: "login",
-  isSigningIn: false
+  isSigningIn: false,
+  crashReports: [],
+  selectedCrashReport: null
 };
 
 const elements = {
@@ -55,6 +57,11 @@ const elements = {
   updateProgress: document.getElementById("update-progress"),
   updateProgressFill: document.getElementById("update-progress-fill"),
   updateProgressLabel: document.getElementById("update-progress-label"),
+  crashReportSummary: document.getElementById("crash-report-summary"),
+  crashReportPreview: document.getElementById("crash-report-preview"),
+  refreshCrashReportsButton: document.getElementById("refresh-crash-reports-button"),
+  viewCrashReportButton: document.getElementById("view-crash-report-button"),
+  exportCrashReportButton: document.getElementById("export-crash-report-button"),
   installedProjectsList: document.getElementById("installed-projects-list"),
   projectIntro: document.getElementById("project-intro"),
   projectViewTitle: document.getElementById("project-view-title"),
@@ -345,6 +352,33 @@ function renderInstalledProjects() {
   });
 }
 
+async function refreshCrashReports() {
+  try {
+    const reports = await window.hanBurger.listCrashReports();
+    state.crashReports = reports || [];
+    state.selectedCrashReport = state.crashReports[0] || null;
+    renderCrashReports();
+  } catch (error) {
+    elements.crashReportSummary.textContent = `讀取錯誤報告失敗: ${error.message}`;
+  }
+}
+
+function renderCrashReports() {
+  if (!state.crashReports.length) {
+    elements.crashReportSummary.textContent = "目前沒有錯誤報告。";
+    elements.crashReportPreview.classList.add("hidden");
+    elements.crashReportPreview.textContent = "";
+    elements.viewCrashReportButton.disabled = true;
+    elements.exportCrashReportButton.disabled = true;
+    return;
+  }
+
+  const latest = state.crashReports[0];
+  elements.crashReportSummary.textContent = `最近報告：${latest.name} · ${new Date(latest.updatedAt).toLocaleString()}`;
+  elements.viewCrashReportButton.disabled = false;
+  elements.exportCrashReportButton.disabled = false;
+}
+
 function renderUser() {
   if (!state.user) {
     elements.userCard.classList.add("is-logged-out");
@@ -417,6 +451,7 @@ function renderAll(config) {
   renderProjectList();
   renderSelectedProject();
   renderInstalledProjects();
+  refreshCrashReports().catch(() => undefined);
   renderUser();
   renderMeta(config);
 }
@@ -502,6 +537,35 @@ elements.projectViewActionButton.addEventListener("click", async () => {
 
 elements.checkUpdatesButton.addEventListener("click", async () => {
   await window.hanBurger.triggerUpdateCheck();
+});
+
+elements.refreshCrashReportsButton.addEventListener("click", async () => {
+  await refreshCrashReports();
+});
+
+elements.viewCrashReportButton.addEventListener("click", async () => {
+  const report = state.selectedCrashReport || state.crashReports[0];
+  if (!report) return;
+
+  try {
+    const content = await window.hanBurger.readCrashReport(report.path);
+    elements.crashReportPreview.textContent = content;
+    elements.crashReportPreview.classList.remove("hidden");
+  } catch (error) {
+    elements.crashReportSummary.textContent = `查看報告失敗: ${error.message}`;
+  }
+});
+
+elements.exportCrashReportButton.addEventListener("click", async () => {
+  const report = state.selectedCrashReport || state.crashReports[0];
+  if (!report) return;
+
+  try {
+    const targetPath = await window.hanBurger.exportCrashReport(report.path);
+    elements.crashReportSummary.textContent = `已下載報告到 ${targetPath}`;
+  } catch (error) {
+    elements.crashReportSummary.textContent = `下載報告失敗: ${error.message}`;
+  }
 });
 
 elements.homeButton.addEventListener("click", () => {
@@ -594,3 +658,21 @@ window.hanBurger
   .catch((error) => {
     elements.updateStatus.textContent = `初始化失敗: ${error.message}`;
   });
+
+window.addEventListener("error", (event) => {
+  window.hanBurger.recordRendererError({
+    message: event.message,
+    filename: event.filename,
+    lineno: event.lineno,
+    colno: event.colno,
+    stack: event.error?.stack || null
+  }).catch(() => undefined);
+});
+
+window.addEventListener("unhandledrejection", (event) => {
+  window.hanBurger.recordRendererError({
+    message: "Unhandled renderer promise rejection",
+    reason: event.reason?.message || String(event.reason),
+    stack: event.reason?.stack || null
+  }).catch(() => undefined);
+});

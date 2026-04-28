@@ -746,6 +746,36 @@ body {
   box-shadow: var(--shadow);
 }
 
+.crash-report-panel {
+  padding: 24px;
+  border: 1px solid var(--border-subtle);
+  border-radius: 24px;
+  background: var(--surface-2);
+  box-shadow: var(--shadow);
+}
+
+.report-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  justify-content: flex-end;
+}
+
+.crash-report-preview {
+  max-height: 340px;
+  overflow: auto;
+  margin: 18px 0 0;
+  padding: 16px;
+  border: 1px solid var(--border-subtle);
+  border-radius: 16px;
+  background: var(--surface-3);
+  color: var(--text);
+  font-family: "Cascadia Mono", "Consolas", monospace;
+  font-size: 12px;
+  line-height: 1.6;
+  white-space: pre-wrap;
+}
+
 .installed-projects-list {
   display: grid;
   gap: 12px;

@@ -12,12 +12,27 @@ const {
 } = require("./project-manager");
 const { openGoogleSignIn } = require("./oauth");
 const { configureUpdater } = require("./updater");
+const {
+  exportCrashReport,
+  initializeCrashReports,
+  listCrashReports,
+  readCrashReport,
+  writeCrashReport
+} = require("./crash-reports");
 
 let mainWindow;
 let appPaths;
 let store;
 let updater;
 const APP_USER_MODEL_ID = "com.hanburger.desktop";
+
+function recordError(kind, error, details = {}) {
+  try {
+    writeCrashReport(kind, error, details);
+  } catch {
+    // Crash reporting must never crash the app.
+  }
+}
 
 function sendToMainWindow(channel, payload) {
   if (!mainWindow || mainWindow.isDestroyed()) {
@@ -34,7 +49,7 @@ function createWindow() {
     minWidth: 1180,
     minHeight: 760,
     backgroundColor: "#0f1415",
-    show: true,
+    show: false,
     frame: false,
     autoHideMenuBar: true,
     webPreferences: {
@@ -66,11 +81,33 @@ function createWindow() {
     }
 
     updateInstalledProjects().catch((error) => {
+      recordError("project-update-startup", error);
       sendToMainWindow("project-update-status", {
         projectId: null,
         stage: "error",
         message: `專案更新檢查失敗: ${error.message}`
       });
+    });
+  });
+
+  mainWindow.once("ready-to-show", () => {
+    mainWindow.show();
+    mainWindow.focus();
+  });
+
+  mainWindow.webContents.on("render-process-gone", (_event, details) => {
+    recordError("renderer-process-gone", null, details);
+  });
+
+  mainWindow.webContents.on("unresponsive", () => {
+    recordError("renderer-unresponsive", null);
+  });
+
+  mainWindow.webContents.on("did-fail-load", (_event, errorCode, errorDescription, validatedURL) => {
+    recordError("renderer-did-fail-load", null, {
+      errorCode,
+      errorDescription,
+      validatedURL
     });
   });
 
@@ -199,6 +236,9 @@ async function updateInstalledProjects() {
         installedVersion: updateResult.installedVersion || project.installedVersion
       };
     } catch (error) {
+      recordError("project-update-background", error, {
+        projectId: project.id
+      });
       sendToMainWindow("project-update-status", {
         projectId: project.id,
         stage: "error",
@@ -224,6 +264,9 @@ function registerIpc() {
     try {
       await updateInstalledProject(projectId);
     } catch (error) {
+      recordError("project-update-entry", error, {
+        projectId
+      });
       sendToMainWindow("project-update-status", {
         projectId,
         stage: "error",
@@ -336,16 +379,46 @@ function registerIpc() {
   ipcMain.handle("window-close", async () => {
     mainWindow.close();
   });
+
+  ipcMain.handle("list-crash-reports", async () => listCrashReports());
+  ipcMain.handle("read-crash-report", async (_event, filePath) => readCrashReport(filePath));
+  ipcMain.handle("export-crash-report", async (_event, filePath) => exportCrashReport(filePath));
+  ipcMain.handle("record-renderer-error", async (_event, payload) => {
+    recordError("renderer-error", payload?.message || "Renderer error", payload || {});
+    return true;
+  });
 }
 
 app.whenReady().then(() => {
+  const lock = app.requestSingleInstanceLock();
+  if (!lock) {
+    app.quit();
+    return;
+  }
+
   app.setAppUserModelId(APP_USER_MODEL_ID);
   appPaths = initializeStorage();
+  initializeCrashReports(appPaths.logsRoot);
   store = createStore(appPaths);
   registerIpc();
   updater = configureUpdater(() => mainWindow);
   createWindow();
   mainWindow.loadFile(path.join(__dirname, "..", "renderer", "index.html"));
+
+  app.on("second-instance", () => {
+    if (!mainWindow || mainWindow.isDestroyed()) {
+      createWindow();
+      mainWindow.loadFile(path.join(__dirname, "..", "renderer", "index.html"));
+      return;
+    }
+
+    if (mainWindow.isMinimized()) {
+      mainWindow.restore();
+    }
+
+    mainWindow.show();
+    mainWindow.focus();
+  });
 
   app.on("activate", () => {
     if (BrowserWindow.getAllWindows().length === 0) {
@@ -353,6 +426,25 @@ app.whenReady().then(() => {
       mainWindow.loadFile(path.join(__dirname, "..", "renderer", "index.html"));
     }
   });
+});
+
+app.on("render-process-gone", (_event, webContents, details) => {
+  recordError("app-render-process-gone", null, {
+    url: webContents?.getURL?.() || null,
+    ...details
+  });
+});
+
+app.on("child-process-gone", (_event, details) => {
+  recordError("child-process-gone", null, details);
+});
+
+process.on("uncaughtException", (error) => {
+  recordError("uncaught-exception", error);
+});
+
+process.on("unhandledRejection", (reason) => {
+  recordError("unhandled-rejection", reason);
 });
 
 app.on("window-all-closed", () => {
