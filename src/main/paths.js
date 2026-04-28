@@ -139,10 +139,24 @@ function getDataRoot(executableRoot) {
 }
 
 function getTemplateRoot() {
+  if (app.isPackaged && process.resourcesPath) {
+    const packagedTemplateRoot = path.join(process.resourcesPath, "app-data");
+    if (fs.existsSync(packagedTemplateRoot)) {
+      return packagedTemplateRoot;
+    }
+  }
+
   return path.resolve(__dirname, "..", "..", "build", "app-data");
 }
 
 function getConfigTemplatePath() {
+  if (app.isPackaged && process.resourcesPath) {
+    const packagedRuntimeConfigPath = path.join(process.resourcesPath, "runtime-config", "app-config.json");
+    if (fs.existsSync(packagedRuntimeConfigPath)) {
+      return packagedRuntimeConfigPath;
+    }
+  }
+
   const runtimeConfigPath = path.resolve(__dirname, "..", "..", "build", "runtime-config", "app-config.json");
   if (fs.existsSync(runtimeConfigPath)) {
     return runtimeConfigPath;

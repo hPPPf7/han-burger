@@ -113,11 +113,13 @@ function startPreviewInstall() {
     dataRoot: getDataFolderPath(),
     autoOpen: elements.autoOpenCheckbox.checked
   }).then(() => {
-    elements.startButton.disabled = true;
-    elements.startButton.textContent = "完成";
+    elements.startButton.disabled = false;
+    elements.startButton.textContent = "關閉";
+    elements.startButton.dataset.action = "close";
   }).catch((error) => {
     elements.startButton.disabled = false;
     elements.startButton.textContent = "重試";
+    elements.startButton.dataset.action = "retry";
     setProgress(0, "安裝失敗", error.message || "安裝流程發生錯誤。");
   }).finally(() => {
     progressTimer = null;
@@ -137,6 +139,11 @@ elements.parentFolder.addEventListener("input", () => {
 });
 
 elements.startButton.addEventListener("click", () => {
+  if (elements.startButton.dataset.action === "close") {
+    window.hanBurgerInstaller?.close?.();
+    return;
+  }
+
   if (currentStep === 1) {
     resetInstallProgress();
     setActiveStep(2);
@@ -144,6 +151,7 @@ elements.startButton.addEventListener("click", () => {
   }
 
   if (currentStep === 2 || currentStep === 3) {
+    elements.startButton.dataset.action = "install";
     resetInstallProgress();
     startPreviewInstall();
   }

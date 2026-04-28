@@ -221,7 +221,7 @@ ipcMain.handle("installer:install-desktop", async (event, options) => {
   sendInstallProgress(event.sender, {
     percent: 100,
     title: "安裝完成",
-    copy: autoOpen ? "Han Burger Desktop 已安裝並開啟。" : "Han Burger Desktop 已安裝完成。"
+    copy: autoOpen ? "Han Burger Desktop 已安裝並開啟，可以關閉此視窗。" : "Han Burger Desktop 已安裝完成，可以關閉此視窗。"
   });
 
   return { ok: true };

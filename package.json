@@ -1,6 +1,6 @@
 {
   "name": "han-burger-desktop",
-  "version": "0.1.15",
+  "version": "0.1.16",
   "description": "Han Burger desktop shell with Google sign-in, project launcher, local storage, and auto-update scaffolding.",
   "main": "src/main/main.js",
   "author": "OpenAI Codex",
@@ -29,10 +29,18 @@
     },
     "files": [
       "src/**/*",
-      "build/app-data/**/*",
-      "build/runtime-config/**/*",
       "app-config.example.json",
       "package.json"
+    ],
+    "extraResources": [
+      {
+        "from": "build/app-data",
+        "to": "app-data"
+      },
+      {
+        "from": "build/runtime-config",
+        "to": "runtime-config"
+      }
     ],
     "extraMetadata": {
       "main": "src/main/main.js"

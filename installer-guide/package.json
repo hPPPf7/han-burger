@@ -1,6 +1,6 @@
 {
   "name": "han-burger-installer-guide",
-  "version": "0.1.15",
+  "version": "0.1.16",
   "main": "installer-guide/main.js",
   "private": true
 }
