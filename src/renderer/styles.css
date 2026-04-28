@@ -422,6 +422,20 @@ body {
   backdrop-filter: blur(6px);
 }
 
+.app-shell.is-update-locked .update-overlay {
+  position: fixed;
+  top: 46px;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  z-index: 100;
+}
+
+.app-shell.is-update-locked .sidebar,
+.app-shell.is-update-locked .content > :not(.update-overlay) {
+  pointer-events: none;
+}
+
 .update-overlay-card {
   width: min(420px, calc(100% - 24px));
   padding: 28px 24px;

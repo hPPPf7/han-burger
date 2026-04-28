@@ -201,7 +201,7 @@ function configureUpdater(getMainWindow) {
 
     autoRestartTimer = setTimeout(() => {
       writePendingUpdateMarker(info.version);
-      autoUpdater.quitAndInstall(false, true);
+      autoUpdater.quitAndInstall(true, true);
     }, AUTO_RESTART_DELAY_MS);
   });
 
@@ -262,7 +262,7 @@ function configureUpdater(getMainWindow) {
       }
 
       writePendingUpdateMarker(downloadedVersion || app.getVersion());
-      autoUpdater.quitAndInstall(false, true);
+      autoUpdater.quitAndInstall(true, true);
       return true;
     }
   };

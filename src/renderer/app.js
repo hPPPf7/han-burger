@@ -78,6 +78,8 @@ const elements = {
   accountUpdatedAt: document.getElementById("account-updated-at")
 };
 
+const appShell = document.querySelector(".app-shell");
+
 state.updateStatus = {
   stage: "idle",
   currentVersion: "-",
@@ -120,40 +122,40 @@ function renderUpdateStatus() {
   elements.updateProgressFill.style.width = `${state.updateStatus.downloaded ? 100 : progressPercent}%`;
   elements.updateProgressLabel.textContent = state.updateStatus.downloaded ? "100%" : `${progressPercent}%`;
 
-  elements.restartUpdateButton.classList.toggle("hidden", !state.updateStatus.downloaded);
-  elements.restartUpdateButton.textContent = "立即重新啟動";
+  elements.restartUpdateButton.classList.add("hidden");
+  elements.restartUpdateButton.textContent = "自動重新啟動中";
   renderUpdateOverlay();
   renderVersionInfo();
 }
 
 function renderUpdateOverlay() {
   const progressPercent = Math.max(0, Math.min(100, Math.round(state.updateStatus.progressPercent || 0)));
-  const isStartupChecking = Boolean(state.updateStatus.startupFlow) &&
-    ["checking", "available", "downloading", "downloaded"].includes(state.updateStatus.stage);
+  const isUpdateActive = ["checking", "available", "downloading", "downloaded", "installing"].includes(state.updateStatus.stage);
   const isInstalling = state.updateStatus.stage === "installing";
-  const shouldShow = isStartupChecking || isInstalling;
+  const shouldShow = isUpdateActive;
   const showOverlayProgress = ["downloading", "downloaded", "installing"].includes(state.updateStatus.stage);
 
   elements.updateOverlay.classList.toggle("hidden", !shouldShow);
+  appShell?.classList.toggle("is-update-locked", shouldShow);
   elements.updateOverlayProgress.classList.toggle("hidden", !showOverlayProgress);
   elements.updateOverlayProgressFill.style.width = `${state.updateStatus.downloaded ? 100 : progressPercent}%`;
   elements.updateOverlayProgressLabel.textContent = state.updateStatus.downloaded ? "100%" : `${progressPercent}%`;
 
-  if (isStartupChecking) {
-    if (state.updateStatus.stage === "available" || state.updateStatus.stage === "downloading") {
-      elements.updateOverlayTitle.textContent = "正在下載更新";
-      elements.updateOverlayMessage.textContent = `正在下載新版本 ${state.updateStatus.latestVersion || ""}，目前進度 ${progressPercent}%。`;
-      return;
-    }
-
-    if (state.updateStatus.stage === "downloaded") {
-      elements.updateOverlayTitle.textContent = "更新已下載完成";
-      elements.updateOverlayMessage.textContent = `新版本 ${state.updateStatus.latestVersion || ""} 已下載完成，系統即將自動重新啟動套用。`;
-      return;
-    }
-
+  if (state.updateStatus.stage === "checking") {
     elements.updateOverlayTitle.textContent = "正在檢查更新";
     elements.updateOverlayMessage.textContent = "請稍候，正在確認目前是否有可用的新版本。";
+    return;
+  }
+
+  if (state.updateStatus.stage === "available" || state.updateStatus.stage === "downloading") {
+    elements.updateOverlayTitle.textContent = "正在下載更新";
+    elements.updateOverlayMessage.textContent = `正在下載新版本 ${state.updateStatus.latestVersion || ""}，目前進度 ${progressPercent}%。`;
+    return;
+  }
+
+  if (state.updateStatus.stage === "downloaded") {
+    elements.updateOverlayTitle.textContent = "更新已下載完成";
+    elements.updateOverlayMessage.textContent = `新版本 ${state.updateStatus.latestVersion || ""} 已下載完成，系統即將自動重新啟動套用。`;
     return;
   }
 
