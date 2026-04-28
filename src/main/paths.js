@@ -79,9 +79,25 @@ function getExecutableRoot() {
   return path.resolve(__dirname, "..", "..");
 }
 
+function getAppDataPath() {
+  try {
+    return app.getPath("appData");
+  } catch {
+    return "";
+  }
+}
+
 function getDataRoot(executableRoot) {
   if (!app.isPackaged) {
     return path.join(executableRoot, "app-data");
+  }
+
+  const appDataPath = getAppDataPath();
+  if (appDataPath) {
+    const sharedDataRootPath = readTextSafe(path.join(appDataPath, "han-burger-desktop", "data-root.txt"));
+    if (sharedDataRootPath) {
+      return path.resolve(sharedDataRootPath);
+    }
   }
 
   const dataRootPath = readTextSafe(path.join(app.getPath("userData"), "data-root.txt"));

@@ -122,12 +122,14 @@ test("packaged initializeStorage uses configured project data folder", () => {
   const fakeExeDir = path.join(tempRoot, "dist");
   const fakeExePath = path.join(fakeExeDir, "Han Burger Desktop.exe");
   const fakeUserData = path.join(tempRoot, "user-data");
+  const fakeAppData = path.join(tempRoot, "app-data-root");
   const customDataRoot = path.join(tempRoot, "custom-project-data");
 
   fs.mkdirSync(fakeExeDir, { recursive: true });
   fs.mkdirSync(fakeUserData, { recursive: true });
+  fs.mkdirSync(path.join(fakeAppData, "han-burger-desktop"), { recursive: true });
   fs.writeFileSync(fakeExePath, "", "utf8");
-  fs.writeFileSync(path.join(fakeUserData, "data-root.txt"), customDataRoot, "utf8");
+  fs.writeFileSync(path.join(fakeAppData, "han-burger-desktop", "data-root.txt"), customDataRoot, "utf8");
 
   const mockApp = {
     isPackaged: true,
@@ -138,6 +140,10 @@ test("packaged initializeStorage uses configured project data folder", () => {
 
       if (name === "userData") {
         return fakeUserData;
+      }
+
+      if (name === "appData") {
+        return fakeAppData;
       }
 
       throw new Error(`Unexpected getPath(${name})`);

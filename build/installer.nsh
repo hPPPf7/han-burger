@@ -123,9 +123,11 @@ FunctionEnd
     ${EndIf}
 
     CreateDirectory "$APPDATA\han-burger-desktop"
+    IfFileExists "$APPDATA\han-burger-desktop\data-root.txt" DataRootWriteDone 0
     FileOpen $0 "$APPDATA\han-burger-desktop\data-root.txt" w
     FileWrite $0 "$ProjectDataDir"
     FileClose $0
+    DataRootWriteDone:
   ${EndIf}
 !macroend
 

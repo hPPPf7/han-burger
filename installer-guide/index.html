@@ -1,0 +1,110 @@
+<!doctype html>
+<html lang="zh-Hant">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Han Burger Installer</title>
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <div class="installer-window">
+      <header class="titlebar">
+        <div class="titlebar-drag">
+          <span class="titlebar-dot"></span>
+          <span>Han Burger Installer</span>
+        </div>
+        <div class="titlebar-actions no-drag">
+          <button id="minimize-button" class="window-button" title="縮小">一</button>
+          <button id="close-button" class="window-button window-button-close" title="關閉">×</button>
+        </div>
+      </header>
+
+      <div class="installer-body">
+        <aside class="brand-rail">
+          <div>
+            <div class="eyebrow">Han Burger</div>
+            <h1>Desktop</h1>
+            <p>首次安裝導引</p>
+          </div>
+
+          <div class="step-list">
+            <div class="step-item is-active" data-step="1">
+              <span>1</span>
+              <strong>選擇資料夾</strong>
+            </div>
+            <div class="step-item" data-step="2">
+              <span>2</span>
+              <strong>確認</strong>
+            </div>
+            <div class="step-item" data-step="3">
+              <span>3</span>
+              <strong>安裝</strong>
+            </div>
+          </div>
+        </aside>
+
+        <main class="content">
+          <section class="intro">
+            <div>
+              <div class="eyebrow">Setup</div>
+              <h2>安裝 Han Burger Desktop</h2>
+              <p id="intro-copy">先選擇要放置 Han Burger 資料夾的位置。導引程式會自動建立 HanBurger 子資料夾，後續更新仍由 Desktop 自動完成。</p>
+            </div>
+            <span class="preview-badge">Preview</span>
+          </section>
+
+          <section id="folder-section" class="form-section">
+            <label class="field">
+              <span>選擇放置位置</span>
+              <div class="path-control">
+                <input id="parent-folder" value="%APPDATA%" />
+                <button id="project-browse-button" class="secondary-button">瀏覽</button>
+              </div>
+            </label>
+            <div class="resolved-path">
+              <span>將建立並使用</span>
+              <strong id="project-folder">%APPDATA%\\HanBurger</strong>
+            </div>
+          </section>
+
+          <section id="confirm-section" class="confirm-section hidden">
+            <div>
+              <span>Han Burger 資料位置</span>
+              <strong id="confirm-project-folder">%APPDATA%\\HanBurger</strong>
+            </div>
+            <label class="checkbox-row">
+              <input id="auto-open-checkbox" type="checkbox" checked />
+              <span>安裝後自動開啟 Han Burger Desktop</span>
+            </label>
+            <p>下一步會下載正式 Han Burger Desktop 安裝器，並把這個資料位置交給主程式使用。</p>
+          </section>
+
+          <section id="note-section" class="note">
+            <strong>會自動建立專用資料夾</strong>
+            <span>例如選擇 D:\SV，實際資料位置會是 D:\SV\HanBurger；不需要先手動建立。</span>
+          </section>
+
+          <section id="progress-section" class="progress-section hidden">
+            <div class="progress-copy">
+              <strong id="progress-title">準備開始</strong>
+              <span id="progress-copy">正在準備下載正式安裝器。</span>
+            </div>
+            <div class="progress-row">
+              <div class="progress-track">
+                <div id="progress-fill" class="progress-fill"></div>
+              </div>
+              <span id="progress-label">0%</span>
+            </div>
+          </section>
+        </main>
+      </div>
+
+      <footer class="actionbar">
+        <button id="back-button" class="secondary-button">上一步</button>
+        <button id="start-button" class="primary-button">下載並安裝</button>
+      </footer>
+    </div>
+
+    <script src="./app.js"></script>
+  </body>
+</html>
