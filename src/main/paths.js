@@ -114,7 +114,13 @@ function copyMissingEntries(templateRoot, targetRoot) {
   }
 
   if (!fs.existsSync(targetRoot)) {
-    fs.cpSync(templateRoot, targetRoot, { recursive: true });
+    try {
+      fs.cpSync(templateRoot, targetRoot, { recursive: true, dereference: true });
+    } catch (error) {
+      if (error.code !== "ENOENT") {
+        throw error;
+      }
+    }
     return;
   }
 
@@ -122,9 +128,19 @@ function copyMissingEntries(templateRoot, targetRoot) {
     const sourcePath = path.join(templateRoot, entry.name);
     const targetPath = path.join(targetRoot, entry.name);
 
+    if (!fs.existsSync(sourcePath)) {
+      continue;
+    }
+
     if (entry.isDirectory()) {
       if (!fs.existsSync(targetPath)) {
-        fs.cpSync(sourcePath, targetPath, { recursive: true });
+        try {
+          fs.cpSync(sourcePath, targetPath, { recursive: true, dereference: true });
+        } catch (error) {
+          if (error.code !== "ENOENT") {
+            throw error;
+          }
+        }
       } else {
         copyMissingEntries(sourcePath, targetPath);
       }
