@@ -158,3 +158,49 @@ test("packaged initializeStorage uses configured project data folder", () => {
 
   fs.rmSync(tempRoot, { recursive: true, force: true });
 });
+
+test("packaged initializeStorage restores missing built-in project metadata", () => {
+  const tempRoot = createTempRoot();
+  const fakeExeDir = path.join(tempRoot, "dist");
+  const fakeExePath = path.join(fakeExeDir, "Han Burger Desktop.exe");
+  const fakeUserData = path.join(tempRoot, "user-data");
+  const fakeDataRoot = path.join(tempRoot, "data-root");
+  const fakeConfigRoot = path.join(fakeDataRoot, "config");
+
+  fs.mkdirSync(fakeExeDir, { recursive: true });
+  fs.mkdirSync(fakeUserData, { recursive: true });
+  fs.mkdirSync(fakeConfigRoot, { recursive: true });
+  fs.writeFileSync(fakeExePath, "", "utf8");
+  fs.writeFileSync(path.join(fakeUserData, "data-root.txt"), fakeDataRoot, "utf8");
+  fs.writeFileSync(path.join(fakeConfigRoot, "projects.json"), JSON.stringify([
+    {
+      id: "custom-project",
+      name: "Custom Project",
+      storagePath: "projects/custom-project",
+      installed: false
+    }
+  ]), "utf8");
+
+  const mockApp = {
+    isPackaged: true,
+    getPath(name) {
+      if (name === "exe") {
+        return fakeExePath;
+      }
+
+      if (name === "userData") {
+        return fakeUserData;
+      }
+
+      throw new Error(`Unexpected getPath(${name})`);
+    }
+  };
+
+  withMockedElectronApp(mockApp, ({ initializeStorage }) => initializeStorage());
+
+  const projects = JSON.parse(fs.readFileSync(path.join(fakeConfigRoot, "projects.json"), "utf8"));
+  assert.ok(projects.some((project) => project.id === "custom-project"));
+  assert.ok(projects.some((project) => project.id === "han-burger-watch"));
+
+  fs.rmSync(tempRoot, { recursive: true, force: true });
+});

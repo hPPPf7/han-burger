@@ -71,6 +71,30 @@ function syncConfigFromTemplate(appConfigPath, configTemplatePath) {
   }
 }
 
+function syncProjectsFromTemplate(projectsPath, projectsTemplatePath) {
+  if (!fs.existsSync(projectsTemplatePath)) {
+    return;
+  }
+
+  const currentProjects = readJsonSafe(projectsPath);
+  const templateProjects = readJsonSafe(projectsTemplatePath);
+  if (!Array.isArray(currentProjects) || !Array.isArray(templateProjects)) {
+    return;
+  }
+
+  const currentIds = new Set(currentProjects.map((project) => project?.id).filter(Boolean));
+  const missingProjects = templateProjects.filter((project) => project?.id && !currentIds.has(project.id));
+  if (missingProjects.length === 0) {
+    return;
+  }
+
+  fs.writeFileSync(
+    projectsPath,
+    `${JSON.stringify([...currentProjects, ...missingProjects], null, 2)}\n`,
+    "utf8"
+  );
+}
+
 function getExecutableRoot() {
   if (app.isPackaged) {
     return path.dirname(app.getPath("exe"));
@@ -205,6 +229,10 @@ function initializeStorage() {
   const configTemplatePath = getConfigTemplatePath();
   const appConfigPath = path.join(paths.configRoot, "app-config.json");
   syncConfigFromTemplate(appConfigPath, configTemplatePath);
+
+  const projectsTemplatePath = path.join(paths.templateRoot, "config", "projects.json");
+  const projectsPath = path.join(paths.configRoot, "projects.json");
+  syncProjectsFromTemplate(projectsPath, projectsTemplatePath);
 
   return paths;
 }
