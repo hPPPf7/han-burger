@@ -4,6 +4,11 @@ release/
 out/
 coverage/
 app-data/
+!build/app-data/
+build/app-data/*
+!build/app-data/config/
+build/app-data/config/*
+!build/app-data/config/projects.json
 build/runtime-config/
 .env
 .codex/

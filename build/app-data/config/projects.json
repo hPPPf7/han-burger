@@ -1,0 +1,38 @@
+[
+  {
+    "id": "han-burger-watch",
+    "name": "Han Burger Watch",
+    "description": "影視紀錄桌面版首頁。可作為第一個專案入口，之後再逐步補齊完整功能。",
+    "storagePath": "projects/han-burger-watch",
+    "installed": false,
+    "installedVersion": null,
+    "availableVersion": "0.1.0",
+    "desktopEnabled": true,
+    "mobileDistributedSeparately": true,
+    "entryFilePath": "projects/han-burger-watch/index.html",
+    "updateFeed": {
+      "provider": "github",
+      "owner": "hPPPf7",
+      "repo": "han-burger-watch",
+      "assetName": "han-burger-watch.zip"
+    }
+  },
+  {
+    "id": "han-burger-calendar",
+    "name": "Han Burger Calendar",
+    "description": "本機優先的日曆與事件工具，支援整天事件、完成標示與自選顏色。",
+    "storagePath": "projects/han-burger-calendar",
+    "installed": false,
+    "installedVersion": null,
+    "availableVersion": "0.1.0",
+    "desktopEnabled": true,
+    "mobileDistributedSeparately": true,
+    "entryFilePath": "projects/han-burger-calendar/index.html",
+    "updateFeed": {
+      "provider": "github",
+      "owner": "hPPPf7",
+      "repo": "han-burger-calendar",
+      "assetName": "han-burger-calendar.zip"
+    }
+  }
+]

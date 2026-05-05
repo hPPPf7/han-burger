@@ -201,6 +201,7 @@ test("packaged initializeStorage restores missing built-in project metadata", ()
   const projects = JSON.parse(fs.readFileSync(path.join(fakeConfigRoot, "projects.json"), "utf8"));
   assert.ok(projects.some((project) => project.id === "custom-project"));
   assert.ok(projects.some((project) => project.id === "han-burger-watch"));
+  assert.ok(projects.some((project) => project.id === "han-burger-calendar"));
 
   fs.rmSync(tempRoot, { recursive: true, force: true });
 });

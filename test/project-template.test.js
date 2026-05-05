@@ -3,11 +3,12 @@ const assert = require("node:assert/strict");
 const fs = require("node:fs");
 const path = require("node:path");
 
-test("core-dashboard is not marked installed without an entry file", () => {
+test("packaged project list contains downloadable apps only", () => {
   const projectsPath = path.join(__dirname, "..", "build", "app-data", "config", "projects.json");
   const projects = JSON.parse(fs.readFileSync(projectsPath, "utf8"));
-  const coreDashboard = projects.find((project) => project.id === "core-dashboard");
+  const ids = projects.map((project) => project.id);
 
-  assert.ok(coreDashboard);
-  assert.equal(coreDashboard.installed, false);
+  assert.deepEqual(ids, ["han-burger-watch", "han-burger-calendar"]);
+  assert.equal(projects.every((project) => project.updateFeed?.provider === "github"), true);
+  assert.equal(projects.every((project) => project.updateFeed?.assetName), true);
 });
