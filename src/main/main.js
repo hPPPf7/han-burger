@@ -11,6 +11,10 @@ const {
   updateInstalledProjectFiles
 } = require("./project-manager");
 const { openGoogleSignIn } = require("./oauth");
+const {
+  readCalendarData,
+  saveCalendarData
+} = require("./calendar-sync");
 const { configureUpdater } = require("./updater");
 const {
   exportCrashReport,
@@ -296,8 +300,10 @@ function registerIpc() {
 
   ipcMain.handle("sign-in-google", async () => {
     const config = store.getConfig();
-    const user = await openGoogleSignIn(config, appPaths);
+    const signInResult = await openGoogleSignIn(config, appPaths);
+    const user = signInResult.user;
     fs.mkdirSync(user.profilePath, { recursive: true });
+    store.saveGoogleAuth(signInResult.auth);
     store.saveUser(user);
 
     const payload = getBootstrapData();
@@ -306,6 +312,7 @@ function registerIpc() {
   });
 
   ipcMain.handle("sign-out", async () => {
+    store.saveGoogleAuth(null);
     store.saveUser(null);
     const payload = getBootstrapData();
     sendToMainWindow("auth-changed", payload);
@@ -343,6 +350,25 @@ function registerIpc() {
 
     store.saveProjects(nextProjects);
     return getBootstrapData();
+  });
+
+  ipcMain.handle("calendar-get-events", async () => {
+    const result = await readCalendarData(appPaths, store.getConfig(), store);
+    return {
+      events: result.data.events,
+      sync: result.sync
+    };
+  });
+
+  ipcMain.handle("calendar-save-events", async (_event, events) => {
+    const result = await saveCalendarData(appPaths, store.getConfig(), store, {
+      version: 1,
+      events
+    });
+    return {
+      events: result.data.events,
+      sync: result.sync
+    };
   });
 
   ipcMain.handle("trigger-update-check", async () => {

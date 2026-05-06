@@ -153,7 +153,7 @@ async function openGoogleSignIn(config, paths) {
   authUrl.searchParams.set("code_challenge", challenge);
   authUrl.searchParams.set("code_challenge_method", "S256");
   authUrl.searchParams.set("access_type", "offline");
-  authUrl.searchParams.set("prompt", "select_account");
+  authUrl.searchParams.set("prompt", "consent select_account");
 
   shell.openExternal(authUrl.toString());
 
@@ -252,12 +252,22 @@ async function openGoogleSignIn(config, paths) {
   const safeUserFolder = String(profile.email || profile.sub || "user").replace(/[^a-zA-Z0-9._-]/g, "_");
 
   return {
+    auth: {
+      accessToken: tokenJson.access_token,
+      refreshToken: tokenJson.refresh_token || "",
+      expiresAt: Date.now() + Math.max(0, Number(tokenJson.expires_in || 0) - 60) * 1000,
+      scope: tokenJson.scope || scopes.join(" "),
+      tokenType: tokenJson.token_type || "Bearer",
+      updatedAt: new Date().toISOString()
+    },
+    user: {
     authProvider: "google",
     email: profile.email || "",
     name: profile.name || profile.email || "Google User",
     avatarUrl: profile.picture || "",
     profilePath: path.join(paths.usersRoot, safeUserFolder),
     updatedAt: new Date().toISOString()
+    }
   };
 }
 

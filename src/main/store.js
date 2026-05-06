@@ -22,6 +22,7 @@ function writeJson(filePath, value) {
 function createStore(paths) {
   const files = {
     appConfig: path.join(paths.configRoot, "app-config.json"),
+    googleAuth: path.join(paths.configRoot, "google-auth.json"),
     projects: path.join(paths.configRoot, "projects.json"),
     user: path.join(paths.configRoot, "user.json")
   };
@@ -110,7 +111,7 @@ function createStore(paths) {
       googleOAuth: {
         clientId: "",
         clientSecret: "",
-        scopes: ["openid", "email", "profile"]
+        scopes: ["openid", "email", "profile", "https://www.googleapis.com/auth/drive.appdata"]
       }
     };
 
@@ -162,11 +163,21 @@ function createStore(paths) {
     writeJson(files.user, user);
   }
 
+  function getGoogleAuth() {
+    return readJson(files.googleAuth, null);
+  }
+
+  function saveGoogleAuth(auth) {
+    writeJson(files.googleAuth, auth);
+  }
+
   return {
     files,
     getConfig,
+    getGoogleAuth,
     getProjects,
     saveProjects,
+    saveGoogleAuth,
     getUser,
     saveUser
   };

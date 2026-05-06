@@ -537,6 +537,42 @@ elements.projectViewActionButton.addEventListener("click", async () => {
   }
 });
 
+window.addEventListener("message", async (event) => {
+  if (event.source !== elements.projectFrame.contentWindow) {
+    return;
+  }
+
+  const message = event.data || {};
+  if (message.source !== "han-burger-calendar" || !message.requestId) {
+    return;
+  }
+
+  try {
+    let payload;
+    if (message.type === "calendar:getEvents") {
+      payload = await window.hanBurger.getCalendarEvents();
+    } else if (message.type === "calendar:saveEvents") {
+      payload = await window.hanBurger.saveCalendarEvents(message.events || []);
+    } else {
+      throw new Error(`Unsupported calendar message: ${message.type}`);
+    }
+
+    event.source.postMessage({
+      source: "han-burger-desktop",
+      requestId: message.requestId,
+      ok: true,
+      payload
+    }, "*");
+  } catch (error) {
+    event.source.postMessage({
+      source: "han-burger-desktop",
+      requestId: message.requestId,
+      ok: false,
+      error: error.message
+    }, "*");
+  }
+});
+
 elements.checkUpdatesButton.addEventListener("click", async () => {
   await window.hanBurger.triggerUpdateCheck();
 });
