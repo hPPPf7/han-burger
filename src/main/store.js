@@ -1,6 +1,19 @@
 const fs = require("node:fs");
 const path = require("node:path");
 
+const DEPRECATED_PROJECT_IDENTIFIERS = new Set([
+  "core-dashboard",
+  "core dashboard",
+  "sample-tools",
+  "sample tools"
+]);
+
+function isDeprecatedProject(project) {
+  return [project.id, project.name]
+    .filter(Boolean)
+    .some((value) => DEPRECATED_PROJECT_IDENTIFIERS.has(String(value).toLowerCase()));
+}
+
 function readJson(filePath, fallbackValue) {
   if (!fs.existsSync(filePath)) {
     return fallbackValue;
@@ -136,21 +149,25 @@ function createStore(paths) {
 
   function getProjects() {
     const projects = readJson(files.projects, []);
-    return projects.map((project) => ({
-      ...project,
-      storagePath: resolveManagedPath(project.storagePath, paths.projectsRoot, "storagePath", project.id),
-      entryFilePath: resolveManagedPath(project.entryFilePath, paths.projectsRoot, "entryFilePath", project.id),
-      installSourcePath: resolveManagedPath(project.installSourcePath, paths.dataRoot, "installSourcePath", project.id)
-    }));
+    return projects
+      .filter((project) => !isDeprecatedProject(project))
+      .map((project) => ({
+        ...project,
+        storagePath: resolveManagedPath(project.storagePath, paths.projectsRoot, "storagePath", project.id),
+        entryFilePath: resolveManagedPath(project.entryFilePath, paths.projectsRoot, "entryFilePath", project.id),
+        installSourcePath: resolveManagedPath(project.installSourcePath, paths.dataRoot, "installSourcePath", project.id)
+      }));
   }
 
   function saveProjects(projects) {
-    const relativeProjects = projects.map((project) => ({
-      ...project,
-      storagePath: relativizeDataPath(project.storagePath, "storagePath", project.id),
-      entryFilePath: relativizeDataPath(project.entryFilePath, "entryFilePath", project.id),
-      installSourcePath: relativizeDataPath(project.installSourcePath, "installSourcePath", project.id)
-    }));
+    const relativeProjects = projects
+      .filter((project) => !isDeprecatedProject(project))
+      .map((project) => ({
+        ...project,
+        storagePath: relativizeDataPath(project.storagePath, "storagePath", project.id),
+        entryFilePath: relativizeDataPath(project.entryFilePath, "entryFilePath", project.id),
+        installSourcePath: relativizeDataPath(project.installSourcePath, "installSourcePath", project.id)
+      }));
 
     writeJson(files.projects, relativeProjects);
   }
