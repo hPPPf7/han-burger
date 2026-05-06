@@ -581,9 +581,25 @@ window.addEventListener("message", async (event) => {
     return;
   }
 
+  const sourceWindow = event.source;
+  if (!sourceWindow) {
+    return;
+  }
+
   const message = event.data || {};
   if (message.source !== "han-burger-calendar" || !message.requestId) {
     return;
+  }
+
+  function reply(payload) {
+    try {
+      sourceWindow.postMessage(payload, "*");
+    } catch (error) {
+      window.hanBurger.recordRendererError({
+        message: "Failed to reply to calendar iframe",
+        detail: error.message
+      });
+    }
   }
 
   try {
@@ -600,19 +616,19 @@ window.addEventListener("message", async (event) => {
       throw new Error(`Unsupported calendar message: ${message.type}`);
     }
 
-    event.source.postMessage({
+    reply({
       source: "han-burger-desktop",
       requestId: message.requestId,
       ok: true,
       payload
-    }, "*");
+    });
   } catch (error) {
-    event.source.postMessage({
+    reply({
       source: "han-burger-desktop",
       requestId: message.requestId,
       ok: false,
       error: error.message
-    }, "*");
+    });
   }
 });
 

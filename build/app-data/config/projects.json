@@ -6,7 +6,7 @@
     "storagePath": "projects/han-burger-watch",
     "installed": false,
     "installedVersion": null,
-    "availableVersion": "0.1.2",
+    "availableVersion": "0.1.4",
     "desktopEnabled": true,
     "mobileDistributedSeparately": true,
     "entryFilePath": "projects/han-burger-watch/index.html",
