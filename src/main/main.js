@@ -13,7 +13,8 @@ const {
 const { openGoogleSignIn } = require("./oauth");
 const {
   readCalendarData,
-  saveCalendarData
+  saveCalendarData,
+  uploadCalendarData
 } = require("./calendar-sync");
 const { configureUpdater } = require("./updater");
 const {
@@ -365,6 +366,26 @@ function registerIpc() {
       version: 1,
       events
     });
+    return {
+      events: result.data.events,
+      sync: result.sync
+    };
+  });
+
+  ipcMain.handle("calendar-download-events", async () => {
+    const result = await readCalendarData(appPaths, store.getConfig(), store);
+    return {
+      events: result.data.events,
+      sync: result.sync
+    };
+  });
+
+  ipcMain.handle("calendar-upload-events", async (_event, events) => {
+    await saveCalendarData(appPaths, store.getConfig(), store, {
+      version: 1,
+      events
+    });
+    const result = await uploadCalendarData(appPaths, store.getConfig(), store);
     return {
       events: result.data.events,
       sync: result.sync

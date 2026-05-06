@@ -255,15 +255,22 @@ async function saveCalendarData(paths, config, store, incomingData) {
   const merged = mergeCalendarData(localData, incomingData);
   writeJson(localPath, merged);
 
-  let sync = {
-    provider: "local",
-    ok: true,
-    message: "已儲存到本機"
+  return {
+    data: merged,
+    sync: {
+      provider: "local",
+      ok: true,
+      message: "已儲存到本機"
+    }
   };
+}
 
+async function uploadCalendarData(paths, config, store) {
+  const localPath = getCalendarDataPath(paths);
+  const localData = normalizeData(readJson(localPath, { version: 1, events: [] }));
   try {
     const remoteData = await readDriveData(config, store);
-    const nextData = remoteData ? mergeCalendarData(merged, remoteData) : merged;
+    const nextData = remoteData ? mergeCalendarData(localData, remoteData) : localData;
     writeJson(localPath, nextData);
     await writeDriveData(config, store, nextData);
     return {
@@ -275,19 +282,21 @@ async function saveCalendarData(paths, config, store, incomingData) {
       }
     };
   } catch (error) {
-    sync = {
-      provider: "google-drive",
-      ok: false,
-      message: error.message
+    return {
+      data: localData,
+      sync: {
+        provider: "google-drive",
+        ok: false,
+        message: error.message
+      }
     };
   }
-
-  return { data: merged, sync };
 }
 
 module.exports = {
   mergeCalendarData,
   normalizeData,
   readCalendarData,
-  saveCalendarData
+  saveCalendarData,
+  uploadCalendarData
 };

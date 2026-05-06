@@ -184,7 +184,43 @@ function showDashboardView() {
   setActiveView("dashboard");
 }
 
+function uploadCalendarBeforeLeaving() {
+  if (state.selectedProjectId !== "han-burger-calendar" || !elements.projectFrame.contentWindow) {
+    return Promise.resolve();
+  }
+
+  const requestId = crypto.randomUUID();
+  return new Promise((resolve) => {
+    const timeoutId = setTimeout(resolve, 6000);
+    function handleMessage(event) {
+      if (event.source !== elements.projectFrame.contentWindow) {
+        return;
+      }
+
+      const message = event.data || {};
+      if (message.source !== "han-burger-calendar-control" || message.requestId !== requestId) {
+        return;
+      }
+
+      clearTimeout(timeoutId);
+      window.removeEventListener("message", handleMessage);
+      resolve();
+    }
+
+    window.addEventListener("message", handleMessage);
+    elements.projectFrame.contentWindow.postMessage({
+      source: "han-burger-desktop-control",
+      requestId,
+      type: "calendar:uploadBeforeClose"
+    }, "*");
+  });
+}
+
 async function showProjectView(project) {
+  if (project.id !== state.selectedProjectId) {
+    await uploadCalendarBeforeLeaving();
+  }
+
   elements.projectViewTitle.textContent = project.name;
   elements.projectViewCopy.textContent = project.description || "目前正在查看專案首頁。";
   elements.projectViewInstalled.textContent = project.installed
@@ -302,6 +338,9 @@ function renderProjectList() {
     button.className = `project-item${isSelected ? " is-selected" : ""}`;
     button.innerHTML = `<strong>${project.name}</strong><span>${project.installed ? project.description : "尚未安裝，安裝後才能進入與更新。"}</span>`;
     button.addEventListener("click", async () => {
+      if (state.selectedProjectId !== project.id) {
+        await uploadCalendarBeforeLeaving();
+      }
       state.selectedProjectId = project.id;
       renderProjectList();
       renderSelectedProject();
@@ -553,6 +592,10 @@ window.addEventListener("message", async (event) => {
       payload = await window.hanBurger.getCalendarEvents();
     } else if (message.type === "calendar:saveEvents") {
       payload = await window.hanBurger.saveCalendarEvents(message.events || []);
+    } else if (message.type === "calendar:downloadEvents") {
+      payload = await window.hanBurger.downloadCalendarEvents();
+    } else if (message.type === "calendar:uploadEvents") {
+      payload = await window.hanBurger.uploadCalendarEvents(message.events || []);
     } else {
       throw new Error(`Unsupported calendar message: ${message.type}`);
     }

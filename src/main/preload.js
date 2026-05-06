@@ -10,6 +10,8 @@ contextBridge.exposeInMainWorld("hanBurger", {
   removeProject: (projectId) => ipcRenderer.invoke("remove-project", projectId),
   getCalendarEvents: () => ipcRenderer.invoke("calendar-get-events"),
   saveCalendarEvents: (events) => ipcRenderer.invoke("calendar-save-events", events),
+  downloadCalendarEvents: () => ipcRenderer.invoke("calendar-download-events"),
+  uploadCalendarEvents: (events) => ipcRenderer.invoke("calendar-upload-events", events),
   triggerUpdateCheck: () => ipcRenderer.invoke("trigger-update-check"),
   restartAndInstallUpdate: () => ipcRenderer.invoke("restart-and-install-update"),
   listCrashReports: () => ipcRenderer.invoke("list-crash-reports"),
