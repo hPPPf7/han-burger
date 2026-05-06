@@ -159,6 +159,39 @@ test("packaged initializeStorage uses configured project data folder", () => {
   fs.rmSync(tempRoot, { recursive: true, force: true });
 });
 
+test("syncConfigFromTemplate appends newly required Google scopes", () => {
+  const tempRoot = createTempRoot();
+  const appConfigPath = path.join(tempRoot, "app-config.json");
+  const templateConfigPath = path.join(tempRoot, "template-config.json");
+  const { syncConfigFromTemplate } = require("../src/main/paths");
+
+  fs.writeFileSync(appConfigPath, JSON.stringify({
+    googleOAuth: {
+      clientId: "client-id",
+      scopes: ["openid", "email", "profile"]
+    }
+  }), "utf8");
+  fs.writeFileSync(templateConfigPath, JSON.stringify({
+    googleOAuth: {
+      clientId: "template-client-id",
+      scopes: ["openid", "email", "profile", "https://www.googleapis.com/auth/drive.appdata"]
+    }
+  }), "utf8");
+
+  syncConfigFromTemplate(appConfigPath, templateConfigPath);
+
+  const config = JSON.parse(fs.readFileSync(appConfigPath, "utf8"));
+  assert.equal(config.googleOAuth.clientId, "client-id");
+  assert.deepEqual(config.googleOAuth.scopes, [
+    "openid",
+    "email",
+    "profile",
+    "https://www.googleapis.com/auth/drive.appdata"
+  ]);
+
+  fs.rmSync(tempRoot, { recursive: true, force: true });
+});
+
 test("packaged initializeStorage restores missing built-in project metadata", () => {
   const tempRoot = createTempRoot();
   const fakeExeDir = path.join(tempRoot, "dist");

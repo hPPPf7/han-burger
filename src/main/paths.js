@@ -61,9 +61,13 @@ function syncConfigFromTemplate(appConfigPath, configTemplatePath) {
     didChange = true;
   }
 
-  if ((!Array.isArray(currentOAuth.scopes) || currentOAuth.scopes.length === 0) && Array.isArray(templateOAuth.scopes)) {
-    nextConfig.googleOAuth.scopes = templateOAuth.scopes;
-    didChange = true;
+  if (Array.isArray(templateOAuth.scopes)) {
+    const currentScopes = Array.isArray(currentOAuth.scopes) ? currentOAuth.scopes : [];
+    const nextScopes = Array.from(new Set([...currentScopes, ...templateOAuth.scopes]));
+    if (nextScopes.length !== currentScopes.length) {
+      nextConfig.googleOAuth.scopes = nextScopes;
+      didChange = true;
+    }
   }
 
   if (didChange) {
@@ -253,5 +257,6 @@ function initializeStorage() {
 
 module.exports = {
   getAppPaths,
-  initializeStorage
+  initializeStorage,
+  syncConfigFromTemplate
 };
