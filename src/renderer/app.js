@@ -62,6 +62,10 @@ const elements = {
   refreshCrashReportsButton: document.getElementById("refresh-crash-reports-button"),
   viewCrashReportButton: document.getElementById("view-crash-report-button"),
   exportCrashReportButton: document.getElementById("export-crash-report-button"),
+  crashReportNotice: document.getElementById("crash-report-notice"),
+  crashReportNoticeMessage: document.getElementById("crash-report-notice-message"),
+  crashReportNoticeViewButton: document.getElementById("crash-report-notice-view"),
+  crashReportNoticeDismissButton: document.getElementById("crash-report-notice-dismiss"),
   installedProjectsList: document.getElementById("installed-projects-list"),
   projectIntro: document.getElementById("project-intro"),
   projectViewTitle: document.getElementById("project-view-title"),
@@ -420,6 +424,31 @@ function renderCrashReports() {
   elements.exportCrashReportButton.disabled = false;
 }
 
+async function showLatestCrashReport() {
+  const report = state.selectedCrashReport || state.crashReports[0];
+  if (!report) return;
+
+  try {
+    const content = await window.hanBurger.readCrashReport(report.path);
+    elements.crashReportPreview.textContent = content;
+    elements.crashReportPreview.classList.remove("hidden");
+  } catch (error) {
+    elements.crashReportSummary.textContent = `查看報告失敗: ${error.message}`;
+  }
+}
+
+async function showCrashReportNotice(payload = {}) {
+  try {
+    await refreshCrashReports();
+    const createdAt = payload.createdAt ? new Date(payload.createdAt).toLocaleString() : "剛剛";
+    const kind = payload.kind ? `（${payload.kind}）` : "";
+    elements.crashReportNoticeMessage.textContent = `${createdAt} 已建立新的錯誤報告${kind}。`;
+    elements.crashReportNotice.classList.remove("hidden");
+  } catch {
+    // Notification UI should never create another report loop.
+  }
+}
+
 function renderUser() {
   if (!state.user) {
     elements.userCard.classList.add("is-logged-out");
@@ -641,16 +670,7 @@ elements.refreshCrashReportsButton.addEventListener("click", async () => {
 });
 
 elements.viewCrashReportButton.addEventListener("click", async () => {
-  const report = state.selectedCrashReport || state.crashReports[0];
-  if (!report) return;
-
-  try {
-    const content = await window.hanBurger.readCrashReport(report.path);
-    elements.crashReportPreview.textContent = content;
-    elements.crashReportPreview.classList.remove("hidden");
-  } catch (error) {
-    elements.crashReportSummary.textContent = `查看報告失敗: ${error.message}`;
-  }
+  await showLatestCrashReport();
 });
 
 elements.exportCrashReportButton.addEventListener("click", async () => {
@@ -663,6 +683,17 @@ elements.exportCrashReportButton.addEventListener("click", async () => {
   } catch (error) {
     elements.crashReportSummary.textContent = `下載報告失敗: ${error.message}`;
   }
+});
+
+elements.crashReportNoticeDismissButton.addEventListener("click", () => {
+  elements.crashReportNotice.classList.add("hidden");
+});
+
+elements.crashReportNoticeViewButton.addEventListener("click", async () => {
+  elements.crashReportNotice.classList.add("hidden");
+  showDashboardView();
+  await refreshCrashReports();
+  await showLatestCrashReport();
 });
 
 elements.homeButton.addEventListener("click", () => {
@@ -738,6 +769,10 @@ window.hanBurger.onUpdateStatus((payload) => {
   };
 
   renderUpdateStatus();
+});
+
+window.hanBurger.onCrashReportCreated((payload) => {
+  showCrashReportNotice(payload).catch(() => undefined);
 });
 
 window.hanBurger.onWindowStateChanged((payload) => {

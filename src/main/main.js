@@ -33,7 +33,12 @@ const APP_USER_MODEL_ID = "com.hanburger.desktop";
 
 function recordError(kind, error, details = {}) {
   try {
-    writeCrashReport(kind, error, details);
+    const reportPath = writeCrashReport(kind, error, details);
+    sendToMainWindow("crash-report-created", {
+      kind,
+      path: reportPath,
+      createdAt: new Date().toISOString()
+    });
   } catch {
     // Crash reporting must never crash the app.
   }
