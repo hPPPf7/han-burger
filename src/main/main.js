@@ -31,6 +31,7 @@ let appPaths;
 let store;
 let updater;
 let calendarWidgetWindow = null;
+let calendarWidgetOpacity = 0.96;
 let calendarStartupSync = null;
 let calendarStartupResult = null;
 let isCalendarUploadBeforeCloseDone = false;
@@ -185,11 +186,11 @@ public static class DesktopHost {
   [DllImport("user32.dll", SetLastError = true)] public static extern bool SetWindowPos(IntPtr hWnd, IntPtr hWndInsertAfter, int X, int Y, int cx, int cy, UInt32 uFlags);
 }
 "@
-    $child = [IntPtr]::new([Int64]$args[0])
-    $x = [Int32]$args[1]
-    $y = [Int32]$args[2]
-    $width = [Int32]$args[3]
-    $height = [Int32]$args[4]
+    $child = [IntPtr]::new([Int64]${handleValue})
+    $x = ${Math.round(bounds.x)}
+    $y = ${Math.round(bounds.y)}
+    $width = ${Math.round(bounds.width)}
+    $height = ${Math.round(bounds.height)}
     $progman = [DesktopHost]::FindWindow("Progman", $null)
     $unused = [IntPtr]::Zero
     [DesktopHost]::SendMessageTimeout($progman, 0x052C, [IntPtr]::Zero, [IntPtr]::Zero, 0, 1000, [ref]$unused) | Out-Null
@@ -226,12 +227,7 @@ public static class DesktopHost {
       "-ExecutionPolicy",
       "Bypass",
       "-Command",
-      script,
-      handleValue,
-      String(bounds.x),
-      String(bounds.y),
-      String(bounds.width),
-      String(bounds.height)
+      script
     ], {
       windowsHide: true
     }, (error, stdout, stderr) => {
@@ -291,6 +287,7 @@ async function openCalendarWidget(theme = "dark") {
       nodeIntegration: false
     }
   });
+  calendarWidgetWindow.setOpacity(calendarWidgetOpacity);
 
   calendarWidgetWindow.on("closed", () => {
     calendarWidgetWindow = null;
@@ -305,7 +302,7 @@ async function openCalendarWidget(theme = "dark") {
   }
 
   calendarWidgetWindow.showInactive();
-  return { opened: true, embedded };
+  return { opened: true, embedded, opacity: calendarWidgetOpacity };
 }
 
 function closeCalendarWidget() {
@@ -314,6 +311,32 @@ function closeCalendarWidget() {
   }
 
   return { closed: true };
+}
+
+function moveCalendarWidget(deltaX, deltaY) {
+  if (!calendarWidgetWindow || calendarWidgetWindow.isDestroyed()) {
+    return { moved: false };
+  }
+
+  const bounds = calendarWidgetWindow.getBounds();
+  const nextBounds = {
+    ...bounds,
+    x: bounds.x + Math.round(Number(deltaX) || 0),
+    y: bounds.y + Math.round(Number(deltaY) || 0)
+  };
+  calendarWidgetWindow.setBounds(nextBounds, false);
+  return { moved: true, bounds: nextBounds };
+}
+
+function setCalendarWidgetOpacity(value) {
+  const opacity = Math.min(1, Math.max(0.35, Number(value) || calendarWidgetOpacity));
+  calendarWidgetOpacity = opacity;
+
+  if (calendarWidgetWindow && !calendarWidgetWindow.isDestroyed()) {
+    calendarWidgetWindow.setOpacity(opacity);
+  }
+
+  return { opacity };
 }
 
 function createWindow() {
@@ -696,6 +719,8 @@ function registerIpc() {
 
   ipcMain.handle("calendar-open-widget", async (_event, theme) => openCalendarWidget(theme));
   ipcMain.handle("calendar-close-widget", async () => closeCalendarWidget());
+  ipcMain.handle("calendar-move-widget", async (_event, deltaX, deltaY) => moveCalendarWidget(deltaX, deltaY));
+  ipcMain.handle("calendar-set-widget-opacity", async (_event, value) => setCalendarWidgetOpacity(value));
 
   ipcMain.handle("trigger-update-check", async () => {
     if (!updater) {
