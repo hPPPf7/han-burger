@@ -348,11 +348,22 @@ async function saveCalendarData(paths, config, store, incomingData) {
   };
 }
 
-async function uploadCalendarData(paths, config, store) {
+async function uploadCalendarData(paths, config, store, options = {}) {
   const localPath = getCalendarDataPath(paths);
   const localData = normalizeData(readJson(localPath, { version: 1, events: [] }));
   const syncState = readSyncState(paths);
   const localHash = getContentHash(localData);
+
+  if (options.skipUnchanged && syncState.lastSyncedHash && localHash === syncState.lastSyncedHash) {
+    return {
+      data: localData,
+      sync: {
+        provider: "local",
+        ok: true,
+        message: "內容沒有變更，已略過上傳"
+      }
+    };
+  }
 
   try {
     const remoteData = await readDriveData(config, store);

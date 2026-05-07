@@ -6,7 +6,8 @@ const test = require("node:test");
 
 const {
   getContentHash,
-  readCalendarData
+  readCalendarData,
+  uploadCalendarData
 } = require("../src/main/calendar-sync");
 
 function makeEvent(id, title) {
@@ -102,4 +103,47 @@ test("readCalendarData downloads remote data when local matches last sync", asyn
     fs.readFileSync(path.join(dataRoot, "sync", "calendar", "events.json"), "utf8")
   );
   assert.deepEqual(localAfterSync.events.map((event) => event.id), ["remote"]);
+});
+
+test("uploadCalendarData skips auto upload when local content is unchanged", async (t) => {
+  const dataRoot = fs.mkdtempSync(path.join(os.tmpdir(), "han-calendar-upload-"));
+  t.after(() => fs.rmSync(dataRoot, { recursive: true, force: true }));
+
+  const paths = { dataRoot };
+  const localData = {
+    version: 1,
+    events: [makeEvent("local", "本機")]
+  };
+
+  writeJson(path.join(dataRoot, "sync", "calendar", "events.json"), localData);
+  writeJson(path.join(dataRoot, "sync", "calendar", "sync-state.json"), {
+    lastSyncedHash: getContentHash(localData),
+    lastSyncedAt: "2026-05-07T00:00:00.000Z"
+  });
+
+  const originalFetch = global.fetch;
+  t.after(() => {
+    global.fetch = originalFetch;
+  });
+
+  let fetchCount = 0;
+  global.fetch = async () => {
+    fetchCount += 1;
+    throw new Error("fetch should not be called for unchanged auto upload");
+  };
+
+  const result = await uploadCalendarData(
+    paths,
+    {},
+    {
+      getGoogleAuth: () => ({
+        accessToken: "token",
+        expiresAt: Date.now() + 600000
+      })
+    },
+    { skipUnchanged: true }
+  );
+
+  assert.equal(result.sync.message, "內容沒有變更，已略過上傳");
+  assert.equal(fetchCount, 0);
 });

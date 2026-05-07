@@ -130,7 +130,9 @@ async function uploadCalendarBeforeClose() {
     message: "正在上傳 Calendar 同步資料，上傳完成後會自動關閉。"
   });
 
-  const result = await uploadCalendarData(appPaths, store.getConfig(), store);
+  const result = await uploadCalendarData(appPaths, store.getConfig(), store, {
+    skipUnchanged: true
+  });
   calendarStartupResult = result;
 
   sendToMainWindow("closing-sync-status", {
