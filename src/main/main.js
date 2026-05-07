@@ -29,6 +29,7 @@ let mainWindow;
 let appPaths;
 let store;
 let updater;
+let calendarWidgetWindow = null;
 let calendarStartupSync = null;
 let calendarStartupResult = null;
 let isCalendarUploadBeforeCloseDone = false;
@@ -141,6 +142,48 @@ async function uploadCalendarBeforeClose() {
       ? "Calendar 同步上傳完成，正在關閉。"
       : `Calendar 同步上傳失敗，仍會關閉：${result.sync?.message || "未知錯誤"}`
   });
+}
+
+function getCalendarProject() {
+  return store.getProjects().find((item) => item.id === "han-burger-calendar");
+}
+
+async function openCalendarWidget(theme = "dark") {
+  const project = getCalendarProject();
+  if (!project?.entryFilePath || !fs.existsSync(project.entryFilePath)) {
+    throw new Error("Calendar 尚未安裝，無法開啟桌面小工具。");
+  }
+
+  if (calendarWidgetWindow && !calendarWidgetWindow.isDestroyed()) {
+    calendarWidgetWindow.focus();
+    return { opened: true };
+  }
+
+  const widgetUrl = new URL(pathToFileURL(project.entryFilePath).toString());
+  widgetUrl.searchParams.set("widget", "1");
+  widgetUrl.searchParams.set("theme", theme === "light" ? "light" : "dark");
+
+  calendarWidgetWindow = new BrowserWindow({
+    width: 760,
+    height: 620,
+    minWidth: 520,
+    minHeight: 420,
+    title: "Han Burger Calendar",
+    backgroundColor: theme === "light" ? "#efe7d8" : "#0e0c0a",
+    autoHideMenuBar: true,
+    webPreferences: {
+      preload: path.join(__dirname, "preload.js"),
+      contextIsolation: true,
+      nodeIntegration: false
+    }
+  });
+
+  calendarWidgetWindow.on("closed", () => {
+    calendarWidgetWindow = null;
+  });
+
+  await calendarWidgetWindow.loadURL(widgetUrl.toString());
+  return { opened: true };
 }
 
 function createWindow() {
@@ -520,6 +563,8 @@ function registerIpc() {
     calendarStartupResult = result;
     return toCalendarPayload(result);
   });
+
+  ipcMain.handle("calendar-open-widget", async (_event, theme) => openCalendarWidget(theme));
 
   ipcMain.handle("trigger-update-check", async () => {
     if (!updater) {
