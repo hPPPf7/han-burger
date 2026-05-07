@@ -228,7 +228,7 @@ public static class DesktopHost {
     $style = ($style -band (-bnot $WS_POPUP)) -bor $WS_CHILD -bor $WS_VISIBLE
     [DesktopHost]::SetWindowLongPtr($child, $GWL_STYLE, [IntPtr]::new($style)) | Out-Null
     [DesktopHost]::SetParent($child, $script:workerw) | Out-Null
-    [DesktopHost]::SetWindowPos($child, [IntPtr]::new(1), $x, $y, $width, $height, 0x0250) | Out-Null
+    [DesktopHost]::SetWindowPos($child, [IntPtr]::Zero, $x, $y, $width, $height, 0x0250) | Out-Null
   `;
 
   return new Promise((resolve, reject) => {
@@ -258,9 +258,8 @@ async function openCalendarWidget(theme = "dark") {
   }
 
   if (calendarWidgetWindow && !calendarWidgetWindow.isDestroyed()) {
-    calendarWidgetWindow.showInactive();
-    calendarWidgetWindow.setAlwaysOnTop(false);
-    return { opened: true, embedded: true, opacity: calendarWidgetOpacity };
+  calendarWidgetWindow.setAlwaysOnTop(false);
+  return { opened: true, embedded: true, opacity: calendarWidgetOpacity };
   }
 
   const widgetUrl = new URL(pathToFileURL(project.entryFilePath).toString());
@@ -312,7 +311,9 @@ async function openCalendarWidget(theme = "dark") {
     recordError("calendar-widget-desktop-embed", error);
   }
 
-  calendarWidgetWindow.showInactive();
+  if (!embedded) {
+    calendarWidgetWindow.showInactive();
+  }
   calendarWidgetWindow.setAlwaysOnTop(false);
   return { opened: true, embedded, opacity: calendarWidgetOpacity };
 }
