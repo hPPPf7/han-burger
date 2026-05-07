@@ -37,7 +37,8 @@ function createStore(paths) {
     appConfig: path.join(paths.configRoot, "app-config.json"),
     googleAuth: path.join(paths.configRoot, "google-auth.json"),
     projects: path.join(paths.configRoot, "projects.json"),
-    user: path.join(paths.configRoot, "user.json")
+    user: path.join(paths.configRoot, "user.json"),
+    windowState: path.join(paths.configRoot, "window-state.json")
   };
 
   function isPathInsideRoot(rootPath, targetPath) {
@@ -180,6 +181,14 @@ function createStore(paths) {
     writeJson(files.user, user);
   }
 
+  function getWindowState() {
+    return readJson(files.windowState, null);
+  }
+
+  function saveWindowState(windowState) {
+    writeJson(files.windowState, windowState);
+  }
+
   function getGoogleAuth() {
     return readJson(files.googleAuth, null);
   }
@@ -196,7 +205,9 @@ function createStore(paths) {
     saveProjects,
     saveGoogleAuth,
     getUser,
-    saveUser
+    saveUser,
+    getWindowState,
+    saveWindowState
   };
 }
 

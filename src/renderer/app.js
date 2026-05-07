@@ -189,35 +189,11 @@ function showDashboardView() {
 }
 
 function uploadCalendarBeforeLeaving() {
-  if (state.selectedProjectId !== "han-burger-calendar" || !elements.projectFrame.contentWindow) {
-    return Promise.resolve();
-  }
+  return Promise.resolve();
+}
 
-  const requestId = crypto.randomUUID();
-  return new Promise((resolve) => {
-    const timeoutId = setTimeout(resolve, 6000);
-    function handleMessage(event) {
-      if (event.source !== elements.projectFrame.contentWindow) {
-        return;
-      }
-
-      const message = event.data || {};
-      if (message.source !== "han-burger-calendar-control" || message.requestId !== requestId) {
-        return;
-      }
-
-      clearTimeout(timeoutId);
-      window.removeEventListener("message", handleMessage);
-      resolve();
-    }
-
-    window.addEventListener("message", handleMessage);
-    elements.projectFrame.contentWindow.postMessage({
-      source: "han-burger-desktop-control",
-      requestId,
-      type: "calendar:uploadBeforeClose"
-    }, "*");
-  });
+function projectNavName(project) {
+  return project.name?.replace(/^Han Burger\s+/i, "") || "Project";
 }
 
 async function showProjectView(project) {
@@ -340,7 +316,7 @@ function renderProjectList() {
     const button = document.createElement("button");
     const isSelected = state.activeView === "project" && project.id === state.selectedProjectId;
     button.className = `project-item${isSelected ? " is-selected" : ""}`;
-    button.innerHTML = `<strong>${project.name}</strong><span>${project.installed ? project.description : "尚未安裝，安裝後才能進入與更新。"}</span>`;
+    button.innerHTML = `<strong>${projectNavName(project)}</strong>`;
     button.addEventListener("click", async () => {
       if (state.selectedProjectId !== project.id) {
         await uploadCalendarBeforeLeaving();
@@ -773,6 +749,15 @@ window.hanBurger.onUpdateStatus((payload) => {
 
 window.hanBurger.onCrashReportCreated((payload) => {
   showCrashReportNotice(payload).catch(() => undefined);
+});
+
+window.hanBurger.onClosingSyncStatus((payload) => {
+  const isActive = ["uploading", "done", "error"].includes(payload?.stage);
+  elements.updateOverlay.classList.toggle("hidden", !isActive);
+  appShell?.classList.toggle("is-update-locked", isActive);
+  elements.updateOverlayProgress.classList.add("hidden");
+  elements.updateOverlayTitle.textContent = payload?.stage === "uploading" ? "正在上傳 Calendar" : "正在關閉";
+  elements.updateOverlayMessage.textContent = payload?.message || "正在處理 Calendar 同步資料。";
 });
 
 window.hanBurger.onWindowStateChanged((payload) => {

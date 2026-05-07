@@ -29,6 +29,10 @@ let mainWindow;
 let appPaths;
 let store;
 let updater;
+let calendarStartupSync = null;
+let calendarStartupResult = null;
+let isCalendarUploadBeforeCloseDone = false;
+let isCalendarUploadBeforeCloseRunning = false;
 const APP_USER_MODEL_ID = "com.hanburger.desktop";
 
 function recordError(kind, error, details = {}) {
@@ -52,10 +56,100 @@ function sendToMainWindow(channel, payload) {
   mainWindow.webContents.send(channel, payload);
 }
 
+function getSavedWindowOptions() {
+  const savedState = store?.getWindowState?.();
+  const bounds = savedState?.bounds || {};
+
+  return {
+    width: Number.isFinite(bounds.width) ? Math.max(1180, bounds.width) : 1440,
+    height: Number.isFinite(bounds.height) ? Math.max(760, bounds.height) : 920,
+    x: Number.isFinite(bounds.x) ? bounds.x : undefined,
+    y: Number.isFinite(bounds.y) ? bounds.y : undefined,
+    isMaximized: Boolean(savedState?.isMaximized)
+  };
+}
+
+function saveWindowState() {
+  if (!mainWindow || mainWindow.isDestroyed() || !store) {
+    return;
+  }
+
+  store.saveWindowState({
+    bounds: mainWindow.isMaximized() ? mainWindow.getNormalBounds() : mainWindow.getBounds(),
+    isMaximized: mainWindow.isMaximized()
+  });
+}
+
+function startCalendarStartupSync(force = false) {
+  if (calendarStartupSync && !force) {
+    return calendarStartupSync;
+  }
+
+  calendarStartupSync = readCalendarData(appPaths, store.getConfig(), store)
+    .then((result) => {
+      calendarStartupResult = result;
+      return result;
+    })
+    .catch((error) => {
+      calendarStartupResult = {
+        data: { version: 1, events: [] },
+        sync: {
+          provider: "google-drive",
+          ok: false,
+          message: error.message
+        }
+      };
+      return calendarStartupResult;
+    });
+
+  return calendarStartupSync;
+}
+
+function toCalendarPayload(result, pending = false) {
+  return {
+    events: result.data.events,
+    sync: {
+      ...result.sync,
+      pending
+    }
+  };
+}
+
+async function getCalendarPayload({ forceRefresh = false } = {}) {
+  const pending = Boolean(calendarStartupSync && !calendarStartupResult);
+  const result = forceRefresh || !calendarStartupResult
+    ? await startCalendarStartupSync(forceRefresh)
+    : calendarStartupResult;
+
+  return toCalendarPayload(result, pending);
+}
+
+async function uploadCalendarBeforeClose() {
+  sendToMainWindow("closing-sync-status", {
+    stage: "uploading",
+    message: "正在上傳 Calendar 同步資料，上傳完成後會自動關閉。"
+  });
+
+  const result = await uploadCalendarData(appPaths, store.getConfig(), store);
+  calendarStartupResult = result;
+
+  sendToMainWindow("closing-sync-status", {
+    stage: result.sync?.ok ? "done" : "error",
+    message: result.sync?.ok
+      ? "Calendar 同步上傳完成，正在關閉。"
+      : `Calendar 同步上傳失敗，仍會關閉：${result.sync?.message || "未知錯誤"}`
+  });
+}
+
 function createWindow() {
+  const windowOptions = getSavedWindowOptions();
+  isCalendarUploadBeforeCloseDone = false;
+  isCalendarUploadBeforeCloseRunning = false;
   mainWindow = new BrowserWindow({
-    width: 1440,
-    height: 920,
+    width: windowOptions.width,
+    height: windowOptions.height,
+    x: windowOptions.x,
+    y: windowOptions.y,
     minWidth: 1180,
     minHeight: 760,
     backgroundColor: "#0f1415",
@@ -68,6 +162,10 @@ function createWindow() {
       nodeIntegration: false
     }
   });
+
+  if (windowOptions.isMaximized) {
+    mainWindow.maximize();
+  }
 
   mainWindow.webContents.on("did-finish-load", async () => {
     sendToMainWindow("window-state-changed", {
@@ -89,6 +187,8 @@ function createWindow() {
     if (updater) {
       await updater.checkForStartupUpdates();
     }
+
+    startCalendarStartupSync();
 
     updateInstalledProjects().catch((error) => {
       recordError("project-update-startup", error);
@@ -122,15 +222,49 @@ function createWindow() {
   });
 
   mainWindow.on("maximize", () => {
+    saveWindowState();
     sendToMainWindow("window-state-changed", {
       isMaximized: true
     });
   });
 
   mainWindow.on("unmaximize", () => {
+    saveWindowState();
     sendToMainWindow("window-state-changed", {
       isMaximized: false
     });
+  });
+
+  mainWindow.on("resize", saveWindowState);
+  mainWindow.on("move", saveWindowState);
+
+  mainWindow.on("close", async (event) => {
+    saveWindowState();
+
+    if (isCalendarUploadBeforeCloseDone || isCalendarUploadBeforeCloseRunning) {
+      return;
+    }
+
+    event.preventDefault();
+    isCalendarUploadBeforeCloseRunning = true;
+
+    try {
+      await uploadCalendarBeforeClose();
+    } catch (error) {
+      recordError("calendar-upload-before-close", error);
+      sendToMainWindow("closing-sync-status", {
+        stage: "error",
+        message: `Calendar 同步上傳失敗，仍會關閉：${error.message}`
+      });
+    } finally {
+      isCalendarUploadBeforeCloseDone = true;
+      isCalendarUploadBeforeCloseRunning = false;
+      setTimeout(() => {
+        if (mainWindow && !mainWindow.isDestroyed()) {
+          mainWindow.close();
+        }
+      }, 400);
+    }
   });
 
   mainWindow.on("closed", () => {
@@ -359,11 +493,7 @@ function registerIpc() {
   });
 
   ipcMain.handle("calendar-get-events", async () => {
-    const result = await readCalendarData(appPaths, store.getConfig(), store);
-    return {
-      events: result.data.events,
-      sync: result.sync
-    };
+    return getCalendarPayload();
   });
 
   ipcMain.handle("calendar-save-events", async (_event, events) => {
@@ -371,18 +501,12 @@ function registerIpc() {
       version: 1,
       events
     });
-    return {
-      events: result.data.events,
-      sync: result.sync
-    };
+    calendarStartupResult = result;
+    return toCalendarPayload(result);
   });
 
   ipcMain.handle("calendar-download-events", async () => {
-    const result = await readCalendarData(appPaths, store.getConfig(), store);
-    return {
-      events: result.data.events,
-      sync: result.sync
-    };
+    return getCalendarPayload({ forceRefresh: true });
   });
 
   ipcMain.handle("calendar-upload-events", async (_event, events) => {
@@ -391,10 +515,8 @@ function registerIpc() {
       events
     });
     const result = await uploadCalendarData(appPaths, store.getConfig(), store);
-    return {
-      events: result.data.events,
-      sync: result.sync
-    };
+    calendarStartupResult = result;
+    return toCalendarPayload(result);
   });
 
   ipcMain.handle("trigger-update-check", async () => {

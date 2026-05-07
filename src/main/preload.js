@@ -26,5 +26,6 @@ contextBridge.exposeInMainWorld("hanBurger", {
   onProjectUpdateStatus: (callback) => ipcRenderer.on("project-update-status", (_event, payload) => callback(payload)),
   onUpdateStatus: (callback) => ipcRenderer.on("update-status", (_event, payload) => callback(payload)),
   onCrashReportCreated: (callback) => ipcRenderer.on("crash-report-created", (_event, payload) => callback(payload)),
+  onClosingSyncStatus: (callback) => ipcRenderer.on("closing-sync-status", (_event, payload) => callback(payload)),
   onWindowStateChanged: (callback) => ipcRenderer.on("window-state-changed", (_event, payload) => callback(payload))
 });
