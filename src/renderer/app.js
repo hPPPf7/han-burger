@@ -196,6 +196,19 @@ function projectNavName(project) {
   return project.name?.replace(/^Han Burger\s+/i, "") || "Project";
 }
 
+function postProjectTheme() {
+  const targetWindow = elements.projectFrame.contentWindow;
+  if (!targetWindow) {
+    return;
+  }
+
+  targetWindow.postMessage({
+    source: "han-burger-desktop",
+    type: "theme",
+    theme: state.theme
+  }, "*");
+}
+
 async function showProjectView(project) {
   if (project.id !== state.selectedProjectId) {
     await uploadCalendarBeforeLeaving();
@@ -294,6 +307,7 @@ function setTheme(theme) {
   document.documentElement.dataset.theme = state.theme;
   elements.themeToggleButton.textContent = state.theme === "dark" ? "Dark" : "Light";
   localStorage.setItem("han-burger-theme", state.theme);
+  postProjectTheme();
 }
 
 function toggleTheme() {
@@ -704,6 +718,10 @@ elements.accountLogoutButton.addEventListener("click", async () => {
 
 elements.themeToggleButton.addEventListener("click", () => {
   toggleTheme();
+});
+
+elements.projectFrame.addEventListener("load", () => {
+  postProjectTheme();
 });
 
 elements.minimizeButton.addEventListener("click", async () => {
