@@ -13,6 +13,7 @@ contextBridge.exposeInMainWorld("hanBurger", {
   downloadCalendarEvents: () => ipcRenderer.invoke("calendar-download-events"),
   uploadCalendarEvents: (events) => ipcRenderer.invoke("calendar-upload-events", events),
   openCalendarWidget: (theme) => ipcRenderer.invoke("calendar-open-widget", theme),
+  closeCalendarWidget: () => ipcRenderer.invoke("calendar-close-widget"),
   triggerUpdateCheck: () => ipcRenderer.invoke("trigger-update-check"),
   restartAndInstallUpdate: () => ipcRenderer.invoke("restart-and-install-update"),
   listCrashReports: () => ipcRenderer.invoke("list-crash-reports"),

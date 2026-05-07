@@ -1,7 +1,8 @@
 const fs = require("node:fs");
 const path = require("node:path");
+const { execFile } = require("node:child_process");
 const { pathToFileURL } = require("node:url");
-const { app, BrowserWindow, ipcMain, Notification } = require("electron");
+const { app, BrowserWindow, ipcMain, Notification, screen } = require("electron");
 const { initializeStorage } = require("./paths");
 const { createStore } = require("./store");
 const {
@@ -35,6 +36,10 @@ let calendarStartupResult = null;
 let isCalendarUploadBeforeCloseDone = false;
 let isCalendarUploadBeforeCloseRunning = false;
 const APP_USER_MODEL_ID = "com.hanburger.desktop";
+const CALENDAR_WIDGET_SIZE = {
+  width: 760,
+  height: 620
+};
 
 function recordError(kind, error, details = {}) {
   try {
@@ -148,6 +153,98 @@ function getCalendarProject() {
   return store.getProjects().find((item) => item.id === "han-burger-calendar");
 }
 
+function getWindowHandleValue(window) {
+  const handle = window.getNativeWindowHandle();
+  if (handle.length >= 8 && typeof handle.readBigUInt64LE === "function") {
+    return handle.readBigUInt64LE(0).toString();
+  }
+
+  return handle.readUInt32LE(0).toString();
+}
+
+function embedWindowIntoWindowsDesktop(window) {
+  if (process.platform !== "win32") {
+    return Promise.resolve(false);
+  }
+
+  const handleValue = getWindowHandleValue(window);
+  const bounds = window.getBounds();
+  const script = `
+    Add-Type @"
+using System;
+using System.Runtime.InteropServices;
+public static class DesktopHost {
+  public delegate bool EnumWindowsProc(IntPtr hWnd, IntPtr lParam);
+  [DllImport("user32.dll", SetLastError = true)] public static extern IntPtr FindWindow(string lpClassName, string lpWindowName);
+  [DllImport("user32.dll", SetLastError = true)] public static extern IntPtr FindWindowEx(IntPtr hwndParent, IntPtr hwndChildAfter, string lpszClass, string lpszWindow);
+  [DllImport("user32.dll", SetLastError = true)] public static extern bool EnumWindows(EnumWindowsProc lpEnumFunc, IntPtr lParam);
+  [DllImport("user32.dll", SetLastError = true)] public static extern IntPtr SendMessageTimeout(IntPtr hWnd, UInt32 Msg, IntPtr wParam, IntPtr lParam, UInt32 fuFlags, UInt32 uTimeout, out IntPtr lpdwResult);
+  [DllImport("user32.dll", SetLastError = true)] public static extern IntPtr GetWindowLongPtr(IntPtr hWnd, int nIndex);
+  [DllImport("user32.dll", SetLastError = true)] public static extern IntPtr SetWindowLongPtr(IntPtr hWnd, int nIndex, IntPtr dwNewLong);
+  [DllImport("user32.dll", SetLastError = true)] public static extern IntPtr SetParent(IntPtr hWndChild, IntPtr hWndNewParent);
+  [DllImport("user32.dll", SetLastError = true)] public static extern bool SetWindowPos(IntPtr hWnd, IntPtr hWndInsertAfter, int X, int Y, int cx, int cy, UInt32 uFlags);
+}
+"@
+    $child = [IntPtr]::new([Int64]$args[0])
+    $x = [Int32]$args[1]
+    $y = [Int32]$args[2]
+    $width = [Int32]$args[3]
+    $height = [Int32]$args[4]
+    $progman = [DesktopHost]::FindWindow("Progman", $null)
+    $unused = [IntPtr]::Zero
+    [DesktopHost]::SendMessageTimeout($progman, 0x052C, [IntPtr]::Zero, [IntPtr]::Zero, 0, 1000, [ref]$unused) | Out-Null
+    $script:workerw = [IntPtr]::Zero
+    [DesktopHost+EnumWindowsProc]$callback = {
+      param([IntPtr]$topHandle, [IntPtr]$topParam)
+      $shellView = [DesktopHost]::FindWindowEx($topHandle, [IntPtr]::Zero, "SHELLDLL_DefView", $null)
+      if ($shellView -ne [IntPtr]::Zero) {
+        $script:workerw = [DesktopHost]::FindWindowEx([IntPtr]::Zero, $topHandle, "WorkerW", $null)
+      }
+      return $true
+    }
+    [DesktopHost]::EnumWindows($callback, [IntPtr]::Zero) | Out-Null
+    if ($script:workerw -eq [IntPtr]::Zero) {
+      $script:workerw = $progman
+    }
+    if ($script:workerw -eq [IntPtr]::Zero) {
+      throw "找不到 Windows 桌面容器。"
+    }
+    $GWL_STYLE = -16
+    $WS_CHILD = [Int64]0x40000000
+    $WS_VISIBLE = [Int64]0x10000000
+    $WS_POPUP = [Int64]0x80000000
+    $style = [DesktopHost]::GetWindowLongPtr($child, $GWL_STYLE).ToInt64()
+    $style = ($style -band (-bnot $WS_POPUP)) -bor $WS_CHILD -bor $WS_VISIBLE
+    [DesktopHost]::SetWindowLongPtr($child, $GWL_STYLE, [IntPtr]::new($style)) | Out-Null
+    [DesktopHost]::SetParent($child, $script:workerw) | Out-Null
+    [DesktopHost]::SetWindowPos($child, [IntPtr]::Zero, $x, $y, $width, $height, 0x0054) | Out-Null
+  `;
+
+  return new Promise((resolve, reject) => {
+    execFile("powershell.exe", [
+      "-NoProfile",
+      "-ExecutionPolicy",
+      "Bypass",
+      "-Command",
+      script,
+      handleValue,
+      String(bounds.x),
+      String(bounds.y),
+      String(bounds.width),
+      String(bounds.height)
+    ], {
+      windowsHide: true
+    }, (error, stdout, stderr) => {
+      if (error) {
+        reject(new Error((stderr || stdout || error.message).trim()));
+        return;
+      }
+
+      resolve(true);
+    });
+  });
+}
+
 async function openCalendarWidget(theme = "dark") {
   const project = getCalendarProject();
   if (!project?.entryFilePath || !fs.existsSync(project.entryFilePath)) {
@@ -163,13 +260,30 @@ async function openCalendarWidget(theme = "dark") {
   widgetUrl.searchParams.set("widget", "1");
   widgetUrl.searchParams.set("theme", theme === "light" ? "light" : "dark");
 
+  const workArea = screen.getPrimaryDisplay().workArea;
+  const widgetBounds = {
+    width: CALENDAR_WIDGET_SIZE.width,
+    height: CALENDAR_WIDGET_SIZE.height,
+    x: workArea.x + 24,
+    y: workArea.y + 24
+  };
+
   calendarWidgetWindow = new BrowserWindow({
-    width: 760,
-    height: 620,
+    width: widgetBounds.width,
+    height: widgetBounds.height,
+    x: widgetBounds.x,
+    y: widgetBounds.y,
     minWidth: 520,
     minHeight: 420,
     title: "Han Burger Calendar",
     backgroundColor: theme === "light" ? "#efe7d8" : "#0e0c0a",
+    show: false,
+    frame: process.platform !== "win32",
+    resizable: process.platform !== "win32",
+    movable: process.platform !== "win32",
+    minimizable: process.platform !== "win32",
+    maximizable: false,
+    skipTaskbar: process.platform === "win32",
     autoHideMenuBar: true,
     webPreferences: {
       preload: path.join(__dirname, "preload.js"),
@@ -183,7 +297,23 @@ async function openCalendarWidget(theme = "dark") {
   });
 
   await calendarWidgetWindow.loadURL(widgetUrl.toString());
-  return { opened: true };
+  let embedded = false;
+  try {
+    embedded = await embedWindowIntoWindowsDesktop(calendarWidgetWindow);
+  } catch (error) {
+    recordError("calendar-widget-desktop-embed", error);
+  }
+
+  calendarWidgetWindow.showInactive();
+  return { opened: true, embedded };
+}
+
+function closeCalendarWidget() {
+  if (calendarWidgetWindow && !calendarWidgetWindow.isDestroyed()) {
+    calendarWidgetWindow.close();
+  }
+
+  return { closed: true };
 }
 
 function createWindow() {
@@ -565,6 +695,7 @@ function registerIpc() {
   });
 
   ipcMain.handle("calendar-open-widget", async (_event, theme) => openCalendarWidget(theme));
+  ipcMain.handle("calendar-close-widget", async () => closeCalendarWidget());
 
   ipcMain.handle("trigger-update-check", async () => {
     if (!updater) {

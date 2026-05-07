@@ -633,6 +633,8 @@ window.addEventListener("message", async (event) => {
       payload = await window.hanBurger.uploadCalendarEvents(message.events || []);
     } else if (message.type === "calendar:openWidget") {
       payload = await window.hanBurger.openCalendarWidget(state.theme);
+    } else if (message.type === "calendar:closeWidget") {
+      payload = await window.hanBurger.closeCalendarWidget();
     } else {
       throw new Error(`Unsupported calendar message: ${message.type}`);
     }
