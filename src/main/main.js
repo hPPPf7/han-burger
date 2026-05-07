@@ -2,7 +2,7 @@ const fs = require("node:fs");
 const path = require("node:path");
 const { execFile } = require("node:child_process");
 const { pathToFileURL } = require("node:url");
-const { app, BrowserWindow, ipcMain, Notification, screen } = require("electron");
+const { app, BrowserWindow, ipcMain, Menu, nativeImage, Notification, screen, Tray } = require("electron");
 const { initializeStorage } = require("./paths");
 const { createStore } = require("./store");
 const {
@@ -31,8 +31,10 @@ let appPaths;
 let store;
 let updater;
 let calendarWidgetWindow = null;
+let calendarWidgetTray = null;
 let calendarWidgetOpacity = 0.96;
 let calendarWidgetEmbedded = false;
+let calendarWidgetScale = 1;
 let calendarStartupSync = null;
 let calendarStartupResult = null;
 let isCalendarUploadBeforeCloseDone = false;
@@ -42,6 +44,50 @@ const CALENDAR_WIDGET_SIZE = {
   width: 760,
   height: 620
 };
+
+function createCalendarTrayIcon() {
+  return nativeImage.createFromDataURL(
+    "data:image/svg+xml;charset=utf-8," +
+    encodeURIComponent(`
+      <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 32 32">
+        <rect x="5" y="6" width="22" height="21" rx="4" fill="#d6a84f"/>
+        <rect x="5" y="10" width="22" height="4" fill="#2b2419"/>
+        <path d="M11 4v5M21 4v5" stroke="#f5efe3" stroke-width="2" stroke-linecap="round"/>
+        <path d="M11 18h3M18 18h3M11 23h3M18 23h3" stroke="#2b2419" stroke-width="2" stroke-linecap="round"/>
+      </svg>
+    `)
+  );
+}
+
+function updateCalendarWidgetTray() {
+  if (!calendarWidgetWindow || calendarWidgetWindow.isDestroyed()) {
+    if (calendarWidgetTray) {
+      calendarWidgetTray.destroy();
+      calendarWidgetTray = null;
+    }
+    return;
+  }
+
+  if (!calendarWidgetTray) {
+    calendarWidgetTray = new Tray(createCalendarTrayIcon());
+  }
+
+  calendarWidgetTray.setToolTip("Han Burger Calendar 小工具");
+  calendarWidgetTray.setContextMenu(Menu.buildFromTemplate([
+    {
+      label: "顯示小工具",
+      click: () => {
+        if (calendarWidgetWindow && !calendarWidgetWindow.isDestroyed()) {
+          calendarWidgetWindow.showInactive();
+        }
+      }
+    },
+    {
+      label: "關閉小工具",
+      click: () => closeCalendarWidget()
+    }
+  ]));
+}
 
 function recordError(kind, error, details = {}) {
   try {
@@ -265,18 +311,25 @@ async function openCalendarWidget(theme = "dark") {
   }
 
   if (calendarWidgetWindow && !calendarWidgetWindow.isDestroyed()) {
-  calendarWidgetWindow.setAlwaysOnTop(false);
-  return { opened: true, embedded: calendarWidgetEmbedded, opacity: calendarWidgetOpacity };
+    calendarWidgetWindow.setAlwaysOnTop(false);
+    return {
+      opened: true,
+      embedded: calendarWidgetEmbedded,
+      opacity: calendarWidgetOpacity,
+      scale: calendarWidgetScale
+    };
   }
 
   const widgetUrl = new URL(pathToFileURL(project.entryFilePath).toString());
   widgetUrl.searchParams.set("widget", "1");
   widgetUrl.searchParams.set("theme", theme === "light" ? "light" : "dark");
+  widgetUrl.searchParams.set("opacity", String(Math.round(calendarWidgetOpacity * 100)));
+  widgetUrl.searchParams.set("scale", String(Math.round(calendarWidgetScale * 100)));
 
   const workArea = screen.getPrimaryDisplay().workArea;
   const widgetBounds = {
-    width: CALENDAR_WIDGET_SIZE.width,
-    height: CALENDAR_WIDGET_SIZE.height,
+    width: Math.round(CALENDAR_WIDGET_SIZE.width * calendarWidgetScale),
+    height: Math.round(CALENDAR_WIDGET_SIZE.height * calendarWidgetScale),
     x: workArea.x + 24,
     y: workArea.y + 24
   };
@@ -286,8 +339,8 @@ async function openCalendarWidget(theme = "dark") {
     height: widgetBounds.height,
     x: widgetBounds.x,
     y: widgetBounds.y,
-    minWidth: 520,
-    minHeight: 420,
+    minWidth: Math.round(CALENDAR_WIDGET_SIZE.width * 0.65),
+    minHeight: Math.round(CALENDAR_WIDGET_SIZE.height * 0.65),
     title: "Han Burger Calendar",
     backgroundColor: theme === "light" ? "#efe7d8" : "#0e0c0a",
     show: false,
@@ -296,7 +349,7 @@ async function openCalendarWidget(theme = "dark") {
     movable: process.platform !== "win32",
     minimizable: process.platform !== "win32",
     maximizable: false,
-    skipTaskbar: false,
+    skipTaskbar: process.platform === "win32",
     autoHideMenuBar: true,
     webPreferences: {
       preload: path.join(__dirname, "preload.js"),
@@ -308,6 +361,8 @@ async function openCalendarWidget(theme = "dark") {
 
   calendarWidgetWindow.on("closed", () => {
     calendarWidgetWindow = null;
+    calendarWidgetEmbedded = false;
+    updateCalendarWidgetTray();
   });
 
   await calendarWidgetWindow.loadURL(widgetUrl.toString());
@@ -323,7 +378,8 @@ async function openCalendarWidget(theme = "dark") {
     calendarWidgetWindow.showInactive();
   }
   calendarWidgetWindow.setAlwaysOnTop(false);
-  return { opened: true, embedded, opacity: calendarWidgetOpacity };
+  updateCalendarWidgetTray();
+  return { opened: true, embedded, opacity: calendarWidgetOpacity, scale: calendarWidgetScale };
 }
 
 function closeCalendarWidget() {
@@ -331,6 +387,7 @@ function closeCalendarWidget() {
     calendarWidgetWindow.close();
   }
   calendarWidgetEmbedded = false;
+  updateCalendarWidgetTray();
 
   return { closed: true };
 }
@@ -359,6 +416,29 @@ function setCalendarWidgetOpacity(value) {
   }
 
   return { opacity };
+}
+
+function setCalendarWidgetScale(value) {
+  const scale = Math.min(1.5, Math.max(0.65, Number(value) || calendarWidgetScale));
+  calendarWidgetScale = scale;
+
+  if (!calendarWidgetWindow || calendarWidgetWindow.isDestroyed()) {
+    return { scale };
+  }
+
+  const bounds = calendarWidgetWindow.getBounds();
+  const nextWidth = Math.round(CALENDAR_WIDGET_SIZE.width * scale);
+  const nextHeight = Math.round(CALENDAR_WIDGET_SIZE.height * scale);
+  calendarWidgetWindow.setBounds({
+    ...bounds,
+    width: nextWidth,
+    height: nextHeight
+  }, false);
+
+  return {
+    scale,
+    bounds: calendarWidgetWindow.getBounds()
+  };
 }
 
 function createWindow() {
@@ -747,6 +827,7 @@ function registerIpc() {
   ipcMain.handle("calendar-close-widget", async () => closeCalendarWidget());
   ipcMain.handle("calendar-move-widget", async (_event, deltaX, deltaY) => moveCalendarWidget(deltaX, deltaY));
   ipcMain.handle("calendar-set-widget-opacity", async (_event, value) => setCalendarWidgetOpacity(value));
+  ipcMain.handle("calendar-set-widget-scale", async (_event, value) => setCalendarWidgetScale(value));
 
   ipcMain.handle("trigger-update-check", async () => {
     if (!updater) {

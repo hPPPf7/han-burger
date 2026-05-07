@@ -652,6 +652,8 @@ window.addEventListener("message", async (event) => {
       payload = await window.hanBurger.moveCalendarWidget(message.deltaX, message.deltaY);
     } else if (message.type === "calendar:setWidgetOpacity") {
       payload = await window.hanBurger.setCalendarWidgetOpacity(message.opacity);
+    } else if (message.type === "calendar:setWidgetScale") {
+      payload = await window.hanBurger.setCalendarWidgetScale(message.scale);
     } else {
       throw new Error(`Unsupported calendar message: ${message.type}`);
     }
