@@ -1,5 +1,6 @@
 const fs = require("node:fs");
 const path = require("node:path");
+const crypto = require("node:crypto");
 
 const CALENDAR_FILE_NAME = "han-burger-calendar-events.json";
 const DRIVE_LIST_URL = "https://www.googleapis.com/drive/v3/files";
@@ -21,6 +22,50 @@ function writeJson(filePath, value) {
 
 function getCalendarDataPath(paths) {
   return path.join(paths.dataRoot, "sync", "calendar", "events.json");
+}
+
+function getCalendarSyncStatePath(paths) {
+  return path.join(paths.dataRoot, "sync", "calendar", "sync-state.json");
+}
+
+function stableEventForHash(event) {
+  return {
+    id: event.id,
+    title: event.title,
+    date: event.date,
+    time: event.time || "",
+    color: event.color,
+    reminderMinutes: event.reminderMinutes,
+    note: event.note || "",
+    done: Boolean(event.done),
+    createdAt: event.createdAt || "",
+    updatedAt: event.updatedAt || "",
+    deletedAt: event.deletedAt || null
+  };
+}
+
+function getContentHash(data) {
+  const normalizedEvents = normalizeData(data).events
+    .map(stableEventForHash)
+    .sort((a, b) => a.id.localeCompare(b.id));
+  return crypto
+    .createHash("sha256")
+    .update(JSON.stringify({ version: 1, events: normalizedEvents }))
+    .digest("hex");
+}
+
+function readSyncState(paths) {
+  return readJson(getCalendarSyncStatePath(paths), {
+    lastSyncedHash: "",
+    lastSyncedAt: null
+  });
+}
+
+function saveSyncState(paths, data) {
+  writeJson(getCalendarSyncStatePath(paths), {
+    lastSyncedHash: getContentHash(data),
+    lastSyncedAt: new Date().toISOString()
+  });
 }
 
 function sanitizeEvent(event) {
@@ -209,6 +254,8 @@ async function writeDriveData(config, store, data) {
 async function readCalendarData(paths, config, store) {
   const localPath = getCalendarDataPath(paths);
   const localData = normalizeData(readJson(localPath, { version: 1, events: [] }));
+  const syncState = readSyncState(paths);
+  const localHash = getContentHash(localData);
   let sync = {
     provider: "local",
     ok: true,
@@ -218,24 +265,60 @@ async function readCalendarData(paths, config, store) {
   try {
     const remoteData = await readDriveData(config, store);
     if (remoteData) {
+      const remoteHash = getContentHash(remoteData);
+
+      if (remoteHash === localHash) {
+        saveSyncState(paths, localData);
+        return {
+          data: localData,
+          sync: {
+            provider: "google-drive",
+            ok: true,
+            message: "已確認 Google Drive 無變更"
+          }
+        };
+      }
+
+      if (localHash === syncState.lastSyncedHash) {
+        writeJson(localPath, remoteData);
+        saveSyncState(paths, remoteData);
+        return {
+          data: remoteData,
+          sync: {
+            provider: "google-drive",
+            ok: true,
+            message: "已下載 Google Drive 變更"
+          }
+        };
+      }
+
+      if (remoteHash === syncState.lastSyncedHash) {
+        return {
+          data: localData,
+          sync: {
+            provider: "google-drive",
+            ok: true,
+            message: "本機有尚未上傳的變更"
+          }
+        };
+      }
+
       const merged = mergeCalendarData(localData, remoteData);
       writeJson(localPath, merged);
-      await writeDriveData(config, store, merged);
       return {
         data: merged,
         sync: {
           provider: "google-drive",
           ok: true,
-          message: "已同步 Google Drive"
+          message: "本機與 Google Drive 都有變更，已先合併到本機"
         }
       };
     }
 
-    await writeDriveData(config, store, localData);
     sync = {
       provider: "google-drive",
       ok: true,
-      message: "已建立 Google Drive 同步檔"
+      message: "Google Drive 尚未建立同步檔"
     };
   } catch (error) {
     sync = {
@@ -268,17 +351,65 @@ async function saveCalendarData(paths, config, store, incomingData) {
 async function uploadCalendarData(paths, config, store) {
   const localPath = getCalendarDataPath(paths);
   const localData = normalizeData(readJson(localPath, { version: 1, events: [] }));
+  const syncState = readSyncState(paths);
+  const localHash = getContentHash(localData);
+
   try {
     const remoteData = await readDriveData(config, store);
-    const nextData = remoteData ? mergeCalendarData(localData, remoteData) : localData;
-    writeJson(localPath, nextData);
+
+    if (remoteData) {
+      const remoteHash = getContentHash(remoteData);
+
+      if (remoteHash === localHash) {
+        saveSyncState(paths, localData);
+        return {
+          data: localData,
+          sync: {
+            provider: "google-drive",
+            ok: true,
+            message: "沒有變更需要上傳"
+          }
+        };
+      }
+
+      if (localHash === syncState.lastSyncedHash) {
+        writeJson(localPath, remoteData);
+        saveSyncState(paths, remoteData);
+        return {
+          data: remoteData,
+          sync: {
+            provider: "google-drive",
+            ok: true,
+            message: "已下載 Google Drive 變更，無需上傳"
+          }
+        };
+      }
+
+      if (remoteHash !== syncState.lastSyncedHash && localHash !== syncState.lastSyncedHash) {
+        const merged = mergeCalendarData(localData, remoteData);
+        writeJson(localPath, merged);
+        await writeDriveData(config, store, merged);
+        saveSyncState(paths, merged);
+        return {
+          data: merged,
+          sync: {
+            provider: "google-drive",
+            ok: true,
+            message: "已合併並上傳 Google Drive"
+          }
+        };
+      }
+    }
+
+    const nextData = localData;
     await writeDriveData(config, store, nextData);
+    saveSyncState(paths, nextData);
     return {
       data: nextData,
       sync: {
         provider: "google-drive",
         ok: true,
-        message: "已同步 Google Drive"
+        message: "已上傳 Google Drive"
       }
     };
   } catch (error) {
@@ -294,6 +425,7 @@ async function uploadCalendarData(paths, config, store) {
 }
 
 module.exports = {
+  getContentHash,
   mergeCalendarData,
   normalizeData,
   readCalendarData,
