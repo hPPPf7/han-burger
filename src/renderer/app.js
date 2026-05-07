@@ -209,6 +209,19 @@ function postProjectTheme() {
   }, "*");
 }
 
+function postCalendarEvents(payload) {
+  const targetWindow = elements.projectFrame.contentWindow;
+  if (!targetWindow) {
+    return;
+  }
+
+  targetWindow.postMessage({
+    source: "han-burger-desktop",
+    type: "calendar:eventsChanged",
+    payload
+  }, "*");
+}
+
 async function showProjectView(project) {
   if (project.id !== state.selectedProjectId) {
     await uploadCalendarBeforeLeaving();
@@ -784,6 +797,10 @@ window.hanBurger.onClosingSyncStatus((payload) => {
   elements.updateOverlayProgress.classList.add("hidden");
   elements.updateOverlayTitle.textContent = payload?.stage === "uploading" ? "正在上傳 Calendar" : "正在關閉";
   elements.updateOverlayMessage.textContent = payload?.message || "正在處理 Calendar 同步資料。";
+});
+
+window.hanBurger.onCalendarEventsChanged((payload) => {
+  postCalendarEvents(payload);
 });
 
 window.hanBurger.onWindowStateChanged((payload) => {

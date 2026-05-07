@@ -32,6 +32,7 @@ let store;
 let updater;
 let calendarWidgetWindow = null;
 let calendarWidgetOpacity = 0.96;
+let calendarWidgetEmbedded = false;
 let calendarStartupSync = null;
 let calendarStartupResult = null;
 let isCalendarUploadBeforeCloseDone = false;
@@ -61,6 +62,19 @@ function sendToMainWindow(channel, payload) {
   }
 
   mainWindow.webContents.send(channel, payload);
+}
+
+function sendToCalendarWidget(channel, payload) {
+  if (!calendarWidgetWindow || calendarWidgetWindow.isDestroyed()) {
+    return;
+  }
+
+  calendarWidgetWindow.webContents.send(channel, payload);
+}
+
+function broadcastCalendarEvents(payload) {
+  sendToMainWindow("calendar-events-changed", payload);
+  sendToCalendarWidget("calendar-events-changed", payload);
 }
 
 function getSavedWindowOptions() {
@@ -210,7 +224,8 @@ public static class DesktopHost {
       $script:workerw = $progman
     }
     if ($script:workerw -eq [IntPtr]::Zero) {
-      throw "Windows WorkerW desktop host was not found."
+      Write-Output "NO_WORKERW"
+      exit 0
     }
     $GWL_STYLE = -16
     $WS_CHILD = [Int64]0x40000000
@@ -238,7 +253,7 @@ public static class DesktopHost {
         return;
       }
 
-      resolve(true);
+      resolve(!stdout.includes("NO_WORKERW"));
     });
   });
 }
@@ -251,7 +266,7 @@ async function openCalendarWidget(theme = "dark") {
 
   if (calendarWidgetWindow && !calendarWidgetWindow.isDestroyed()) {
   calendarWidgetWindow.setAlwaysOnTop(false);
-  return { opened: true, embedded: true, opacity: calendarWidgetOpacity };
+  return { opened: true, embedded: calendarWidgetEmbedded, opacity: calendarWidgetOpacity };
   }
 
   const widgetUrl = new URL(pathToFileURL(project.entryFilePath).toString());
@@ -303,6 +318,7 @@ async function openCalendarWidget(theme = "dark") {
     recordError("calendar-widget-desktop-embed", error);
   }
 
+  calendarWidgetEmbedded = embedded;
   if (!embedded) {
     calendarWidgetWindow.showInactive();
   }
@@ -314,6 +330,7 @@ function closeCalendarWidget() {
   if (calendarWidgetWindow && !calendarWidgetWindow.isDestroyed()) {
     calendarWidgetWindow.close();
   }
+  calendarWidgetEmbedded = false;
 
   return { closed: true };
 }
@@ -705,7 +722,9 @@ function registerIpc() {
       events
     });
     calendarStartupResult = result;
-    return toCalendarPayload(result);
+    const payload = toCalendarPayload(result);
+    broadcastCalendarEvents(payload);
+    return payload;
   });
 
   ipcMain.handle("calendar-download-events", async () => {
@@ -719,7 +738,9 @@ function registerIpc() {
     });
     const result = await uploadCalendarData(appPaths, store.getConfig(), store);
     calendarStartupResult = result;
-    return toCalendarPayload(result);
+    const payload = toCalendarPayload(result);
+    broadcastCalendarEvents(payload);
+    return payload;
   });
 
   ipcMain.handle("calendar-open-widget", async (_event, theme) => openCalendarWidget(theme));
