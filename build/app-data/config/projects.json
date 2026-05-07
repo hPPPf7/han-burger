@@ -24,7 +24,7 @@
     "storagePath": "projects/han-burger-calendar",
     "installed": false,
     "installedVersion": null,
-    "availableVersion": "0.1.13",
+    "availableVersion": "0.1.14",
     "desktopEnabled": true,
     "mobileDistributedSeparately": true,
     "entryFilePath": "projects/han-burger-calendar/index.html",
