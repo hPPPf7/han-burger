@@ -36,6 +36,7 @@ function stableEventForHash(event) {
     time: event.time || "",
     color: event.color,
     reminderMinutes: event.reminderMinutes,
+    reminderRepeat: event.reminderRepeat || (Number(event.reminderMinutes) < 0 ? "none" : "once"),
     note: event.note || "",
     done: Boolean(event.done),
     createdAt: event.createdAt || "",
@@ -81,6 +82,11 @@ function sanitizeEvent(event) {
     time: event.time ? String(event.time) : "",
     color: /^#[0-9a-f]{6}$/i.test(event.color || "") ? event.color : "#7aa7ff",
     reminderMinutes: Number.isFinite(Number(event.reminderMinutes)) ? Number(event.reminderMinutes) : 15,
+    reminderRepeat: ["none", "once", "hourly", "daily"].includes(event.reminderRepeat)
+      ? event.reminderRepeat
+      : Number(event.reminderMinutes) < 0
+        ? "none"
+        : "once",
     note: event.note ? String(event.note) : "",
     done: Boolean(event.done),
     createdAt: event.createdAt || now,

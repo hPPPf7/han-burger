@@ -6,6 +6,7 @@ const test = require("node:test");
 
 const {
   getContentHash,
+  normalizeData,
   readCalendarData,
   uploadCalendarData
 } = require("../src/main/calendar-sync");
@@ -42,6 +43,22 @@ test("getContentHash is stable when event order changes", () => {
   };
 
   assert.equal(getContentHash(first), getContentHash(second));
+});
+
+test("normalizeData preserves reminder repeat settings with legacy fallback", () => {
+  const normalized = normalizeData({
+    version: 1,
+    events: [
+      { ...makeEvent("hourly", "每小時"), reminderRepeat: "hourly", reminderMinutes: 60 },
+      { ...makeEvent("legacy-off", "舊版不提醒"), reminderMinutes: -1 },
+      { ...makeEvent("legacy-on", "舊版提醒"), reminderMinutes: 15 }
+    ]
+  });
+
+  assert.deepEqual(
+    normalized.events.map((event) => event.reminderRepeat),
+    ["hourly", "none", "once"]
+  );
 });
 
 test("readCalendarData downloads remote data when local matches last sync", async (t) => {
