@@ -179,8 +179,6 @@ public static class DesktopHost {
   [DllImport("user32.dll", SetLastError = true)] public static extern IntPtr FindWindow(string lpClassName, string lpWindowName);
   [DllImport("user32.dll", SetLastError = true)] public static extern IntPtr FindWindowEx(IntPtr hwndParent, IntPtr hwndChildAfter, string lpszClass, string lpszWindow);
   [DllImport("user32.dll", SetLastError = true)] public static extern bool EnumWindows(EnumWindowsProc lpEnumFunc, IntPtr lParam);
-  [DllImport("user32.dll", SetLastError = true)] public static extern IntPtr GetShellWindow();
-  [DllImport("user32.dll", SetLastError = true)] public static extern IntPtr GetDesktopWindow();
   [DllImport("user32.dll", SetLastError = true)] public static extern IntPtr SendMessageTimeout(IntPtr hWnd, UInt32 Msg, IntPtr wParam, IntPtr lParam, UInt32 fuFlags, UInt32 uTimeout, out IntPtr lpdwResult);
   [DllImport("user32.dll", SetLastError = true)] public static extern IntPtr GetWindowLongPtr(IntPtr hWnd, int nIndex);
   [DllImport("user32.dll", SetLastError = true)] public static extern IntPtr SetWindowLongPtr(IntPtr hWnd, int nIndex, IntPtr dwNewLong);
@@ -212,13 +210,7 @@ public static class DesktopHost {
       $script:workerw = $progman
     }
     if ($script:workerw -eq [IntPtr]::Zero) {
-      $script:workerw = [DesktopHost]::GetShellWindow()
-    }
-    if ($script:workerw -eq [IntPtr]::Zero) {
-      $script:workerw = [DesktopHost]::GetDesktopWindow()
-    }
-    if ($script:workerw -eq [IntPtr]::Zero) {
-      throw "Windows desktop host was not found."
+      throw "Windows WorkerW desktop host was not found."
     }
     $GWL_STYLE = -16
     $WS_CHILD = [Int64]0x40000000
@@ -289,7 +281,7 @@ async function openCalendarWidget(theme = "dark") {
     movable: process.platform !== "win32",
     minimizable: process.platform !== "win32",
     maximizable: false,
-    skipTaskbar: process.platform === "win32",
+    skipTaskbar: false,
     autoHideMenuBar: true,
     webPreferences: {
       preload: path.join(__dirname, "preload.js"),
