@@ -179,6 +179,8 @@ public static class DesktopHost {
   [DllImport("user32.dll", SetLastError = true)] public static extern IntPtr FindWindow(string lpClassName, string lpWindowName);
   [DllImport("user32.dll", SetLastError = true)] public static extern IntPtr FindWindowEx(IntPtr hwndParent, IntPtr hwndChildAfter, string lpszClass, string lpszWindow);
   [DllImport("user32.dll", SetLastError = true)] public static extern bool EnumWindows(EnumWindowsProc lpEnumFunc, IntPtr lParam);
+  [DllImport("user32.dll", SetLastError = true)] public static extern IntPtr GetShellWindow();
+  [DllImport("user32.dll", SetLastError = true)] public static extern IntPtr GetDesktopWindow();
   [DllImport("user32.dll", SetLastError = true)] public static extern IntPtr SendMessageTimeout(IntPtr hWnd, UInt32 Msg, IntPtr wParam, IntPtr lParam, UInt32 fuFlags, UInt32 uTimeout, out IntPtr lpdwResult);
   [DllImport("user32.dll", SetLastError = true)] public static extern IntPtr GetWindowLongPtr(IntPtr hWnd, int nIndex);
   [DllImport("user32.dll", SetLastError = true)] public static extern IntPtr SetWindowLongPtr(IntPtr hWnd, int nIndex, IntPtr dwNewLong);
@@ -192,8 +194,10 @@ public static class DesktopHost {
     $width = ${Math.round(bounds.width)}
     $height = ${Math.round(bounds.height)}
     $progman = [DesktopHost]::FindWindow("Progman", $null)
-    $unused = [IntPtr]::Zero
-    [DesktopHost]::SendMessageTimeout($progman, 0x052C, [IntPtr]::Zero, [IntPtr]::Zero, 0, 1000, [ref]$unused) | Out-Null
+    if ($progman -ne [IntPtr]::Zero) {
+      $unused = [IntPtr]::Zero
+      [DesktopHost]::SendMessageTimeout($progman, 0x052C, [IntPtr]::Zero, [IntPtr]::Zero, 0, 1000, [ref]$unused) | Out-Null
+    }
     $script:workerw = [IntPtr]::Zero
     [DesktopHost+EnumWindowsProc]$callback = {
       param([IntPtr]$topHandle, [IntPtr]$topParam)
@@ -208,7 +212,13 @@ public static class DesktopHost {
       $script:workerw = $progman
     }
     if ($script:workerw -eq [IntPtr]::Zero) {
-      throw "找不到 Windows 桌面容器。"
+      $script:workerw = [DesktopHost]::GetShellWindow()
+    }
+    if ($script:workerw -eq [IntPtr]::Zero) {
+      $script:workerw = [DesktopHost]::GetDesktopWindow()
+    }
+    if ($script:workerw -eq [IntPtr]::Zero) {
+      throw "Windows desktop host was not found."
     }
     $GWL_STYLE = -16
     $WS_CHILD = [Int64]0x40000000
@@ -218,7 +228,7 @@ public static class DesktopHost {
     $style = ($style -band (-bnot $WS_POPUP)) -bor $WS_CHILD -bor $WS_VISIBLE
     [DesktopHost]::SetWindowLongPtr($child, $GWL_STYLE, [IntPtr]::new($style)) | Out-Null
     [DesktopHost]::SetParent($child, $script:workerw) | Out-Null
-    [DesktopHost]::SetWindowPos($child, [IntPtr]::Zero, $x, $y, $width, $height, 0x0054) | Out-Null
+    [DesktopHost]::SetWindowPos($child, [IntPtr]::new(1), $x, $y, $width, $height, 0x0250) | Out-Null
   `;
 
   return new Promise((resolve, reject) => {
@@ -248,8 +258,9 @@ async function openCalendarWidget(theme = "dark") {
   }
 
   if (calendarWidgetWindow && !calendarWidgetWindow.isDestroyed()) {
-    calendarWidgetWindow.focus();
-    return { opened: true };
+    calendarWidgetWindow.showInactive();
+    calendarWidgetWindow.setAlwaysOnTop(false);
+    return { opened: true, embedded: true, opacity: calendarWidgetOpacity };
   }
 
   const widgetUrl = new URL(pathToFileURL(project.entryFilePath).toString());
@@ -302,6 +313,7 @@ async function openCalendarWidget(theme = "dark") {
   }
 
   calendarWidgetWindow.showInactive();
+  calendarWidgetWindow.setAlwaysOnTop(false);
   return { opened: true, embedded, opacity: calendarWidgetOpacity };
 }
 
