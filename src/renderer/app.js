@@ -650,6 +650,8 @@ window.addEventListener("message", async (event) => {
       payload = await window.hanBurger.closeCalendarWidget();
     } else if (message.type === "calendar:moveWidget") {
       payload = await window.hanBurger.moveCalendarWidget(message.deltaX, message.deltaY);
+    } else if (message.type === "calendar:resizeWidget") {
+      payload = await window.hanBurger.resizeCalendarWidget(message.deltaX, message.deltaY);
     } else if (message.type === "calendar:setWidgetOpacity") {
       payload = await window.hanBurger.setCalendarWidgetOpacity(message.opacity);
     } else if (message.type === "calendar:setWidgetScale") {

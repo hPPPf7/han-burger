@@ -46,17 +46,46 @@ const CALENDAR_WIDGET_SIZE = {
 };
 
 function createCalendarTrayIcon() {
-  return nativeImage.createFromDataURL(
-    "data:image/svg+xml;charset=utf-8," +
-    encodeURIComponent(`
-      <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 32 32">
-        <rect x="5" y="6" width="22" height="21" rx="4" fill="#d6a84f"/>
-        <rect x="5" y="10" width="22" height="4" fill="#2b2419"/>
-        <path d="M11 4v5M21 4v5" stroke="#f5efe3" stroke-width="2" stroke-linecap="round"/>
-        <path d="M11 18h3M18 18h3M11 23h3M18 23h3" stroke="#2b2419" stroke-width="2" stroke-linecap="round"/>
-      </svg>
-    `)
-  );
+  const width = 16;
+  const height = 16;
+  const buffer = Buffer.alloc(width * height * 4);
+
+  function setPixel(x, y, color) {
+    if (x < 0 || x >= width || y < 0 || y >= height) return;
+    const index = (y * width + x) * 4;
+    buffer[index] = color.b;
+    buffer[index + 1] = color.g;
+    buffer[index + 2] = color.r;
+    buffer[index + 3] = color.a;
+  }
+
+  function fillRect(x, y, rectWidth, rectHeight, color) {
+    for (let py = y; py < y + rectHeight; py += 1) {
+      for (let px = x; px < x + rectWidth; px += 1) {
+        setPixel(px, py, color);
+      }
+    }
+  }
+
+  const transparent = { r: 0, g: 0, b: 0, a: 0 };
+  const amber = { r: 214, g: 168, b: 79, a: 255 };
+  const dark = { r: 35, g: 30, b: 22, a: 255 };
+  const light = { r: 245, g: 239, b: 227, a: 255 };
+  fillRect(0, 0, width, height, transparent);
+  fillRect(2, 3, 12, 11, amber);
+  fillRect(2, 5, 12, 2, dark);
+  fillRect(4, 2, 2, 4, light);
+  fillRect(10, 2, 2, 4, light);
+  fillRect(5, 9, 2, 2, dark);
+  fillRect(9, 9, 2, 2, dark);
+  fillRect(5, 12, 2, 1, dark);
+  fillRect(9, 12, 2, 1, dark);
+
+  return nativeImage.createFromBitmap(buffer, {
+    width,
+    height,
+    scaleFactor: 1
+  });
 }
 
 function updateCalendarWidgetTray() {
@@ -437,6 +466,37 @@ function setCalendarWidgetScale(value) {
 
   return {
     scale,
+    bounds: calendarWidgetWindow.getBounds()
+  };
+}
+
+function resizeCalendarWidget(deltaX, deltaY) {
+  if (!calendarWidgetWindow || calendarWidgetWindow.isDestroyed()) {
+    return { resized: false };
+  }
+
+  const bounds = calendarWidgetWindow.getBounds();
+  const minWidth = Math.round(CALENDAR_WIDGET_SIZE.width * 0.65);
+  const minHeight = Math.round(CALENDAR_WIDGET_SIZE.height * 0.65);
+  const maxWidth = Math.round(CALENDAR_WIDGET_SIZE.width * 1.5);
+  const maxHeight = Math.round(CALENDAR_WIDGET_SIZE.height * 1.5);
+  const requestedWidth = bounds.width + Math.round(Number(deltaX) || 0);
+  const requestedHeight = bounds.height + Math.round(Number(deltaY) || 0);
+  const nextWidth = Math.min(maxWidth, Math.max(minWidth, requestedWidth));
+  const nextHeight = Math.min(maxHeight, Math.max(minHeight, requestedHeight));
+  const scaleByWidth = nextWidth / CALENDAR_WIDGET_SIZE.width;
+  const scaleByHeight = nextHeight / CALENDAR_WIDGET_SIZE.height;
+  calendarWidgetScale = Math.min(1.5, Math.max(0.65, Math.max(scaleByWidth, scaleByHeight)));
+
+  calendarWidgetWindow.setBounds({
+    ...bounds,
+    width: nextWidth,
+    height: nextHeight
+  }, false);
+
+  return {
+    resized: true,
+    scale: calendarWidgetScale,
     bounds: calendarWidgetWindow.getBounds()
   };
 }
@@ -826,6 +886,7 @@ function registerIpc() {
   ipcMain.handle("calendar-open-widget", async (_event, theme) => openCalendarWidget(theme));
   ipcMain.handle("calendar-close-widget", async () => closeCalendarWidget());
   ipcMain.handle("calendar-move-widget", async (_event, deltaX, deltaY) => moveCalendarWidget(deltaX, deltaY));
+  ipcMain.handle("calendar-resize-widget", async (_event, deltaX, deltaY) => resizeCalendarWidget(deltaX, deltaY));
   ipcMain.handle("calendar-set-widget-opacity", async (_event, value) => setCalendarWidgetOpacity(value));
   ipcMain.handle("calendar-set-widget-scale", async (_event, value) => setCalendarWidgetScale(value));
 
