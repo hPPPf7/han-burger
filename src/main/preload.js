@@ -7,6 +7,7 @@ contextBridge.exposeInMainWorld("hanBurger", {
   signOut: () => ipcRenderer.invoke("sign-out"),
   installProject: (projectId) => ipcRenderer.invoke("install-project", projectId),
   updateInstalledProjects: () => ipcRenderer.invoke("update-installed-projects"),
+  setAutoLaunch: (enabled) => ipcRenderer.invoke("set-auto-launch", enabled),
   removeProject: (projectId) => ipcRenderer.invoke("remove-project", projectId),
   getCalendarEvents: () => ipcRenderer.invoke("calendar-get-events"),
   saveCalendarEvents: (events) => ipcRenderer.invoke("calendar-save-events", events),

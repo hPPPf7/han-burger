@@ -3,6 +3,7 @@ const state = {
   user: null,
   selectedProjectId: null,
   loadedProjectEntries: {},
+  autoLaunchEnabled: false,
   paths: null,
   notes: null,
   theme: "dark",
@@ -24,6 +25,7 @@ const elements = {
   projectList: document.getElementById("project-list"),
   googleLoginButton: document.getElementById("google-login-button"),
   checkUpdatesButton: document.getElementById("check-updates-button"),
+  autoLaunchButton: document.getElementById("auto-launch-button"),
   restartUpdateButton: document.getElementById("restart-update-button"),
   accountLogoutButton: document.getElementById("account-logout-button"),
   loginView: document.getElementById("login-view"),
@@ -110,6 +112,11 @@ function renderVersionInfo() {
   elements.loginCurrentVersion.textContent = formatVersion(currentVersion);
   elements.dashboardCurrentVersion.textContent = formatVersion(currentVersion);
   elements.dashboardLatestVersion.textContent = latestVersion === currentVersion ? formatVersion(currentVersion) : formatVersion(latestVersion);
+}
+
+function renderAutoLaunch() {
+  elements.autoLaunchButton.textContent = `開機自啟動：${state.autoLaunchEnabled ? "開啟" : "關閉"}`;
+  elements.autoLaunchButton.classList.toggle("is-active", state.autoLaunchEnabled);
 }
 
 function renderUpdateStatus() {
@@ -527,12 +534,14 @@ function renderAll(config) {
   refreshCrashReports().catch(() => undefined);
   renderUser();
   renderMeta(config);
+  renderAutoLaunch();
 }
 
 function applyBootstrap(payload) {
   state.appVersion = payload.appVersion || state.appVersion || "-";
   state.projects = payload.projects;
   state.user = payload.user;
+  state.autoLaunchEnabled = Boolean(payload.autoLaunchEnabled);
   state.paths = payload.paths;
   state.notes = payload.notes;
   if (!state.projects.some((project) => project.id === state.selectedProjectId)) {
@@ -678,6 +687,17 @@ window.addEventListener("message", async (event) => {
 
 elements.checkUpdatesButton.addEventListener("click", async () => {
   await window.hanBurger.triggerUpdateCheck();
+});
+
+elements.autoLaunchButton.addEventListener("click", async () => {
+  elements.autoLaunchButton.disabled = true;
+  try {
+    const result = await window.hanBurger.setAutoLaunch(!state.autoLaunchEnabled);
+    state.autoLaunchEnabled = Boolean(result.autoLaunchEnabled);
+    renderAutoLaunch();
+  } finally {
+    elements.autoLaunchButton.disabled = false;
+  }
 });
 
 elements.refreshCrashReportsButton.addEventListener("click", async () => {

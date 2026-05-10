@@ -520,6 +520,13 @@ body {
   line-height: 1.7;
 }
 
+.page-head-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 10px;
+}
+
 .login-page-body,
 .account-layout {
   display: grid;
@@ -613,6 +620,12 @@ body {
   background: var(--ghost-bg);
   color: var(--ghost-text);
   border: 1px solid var(--ghost-border);
+}
+
+.ghost-button.is-active {
+  background: var(--accent-soft);
+  color: var(--accent);
+  border-color: var(--accent-border);
 }
 
 .danger-button {

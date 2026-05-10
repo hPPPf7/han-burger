@@ -243,6 +243,19 @@ function getCalendarProject() {
   return store.getProjects().find((item) => item.id === "han-burger-calendar");
 }
 
+function getAutoLaunchEnabled() {
+  return app.getLoginItemSettings().openAtLogin;
+}
+
+function setAutoLaunchEnabled(enabled) {
+  app.setLoginItemSettings({
+    openAtLogin: Boolean(enabled),
+    path: process.execPath
+  });
+
+  return getAutoLaunchEnabled();
+}
+
 function getWindowHandleValue(window) {
   const handle = window.getNativeWindowHandle();
   if (handle.length >= 8 && typeof handle.readBigUInt64LE === "function") {
@@ -646,6 +659,7 @@ function getBootstrapData() {
       ),
       updateFeedConfigured: true
     },
+    autoLaunchEnabled: getAutoLaunchEnabled(),
     appVersion: app.getVersion(),
     user,
     projects,
@@ -828,6 +842,10 @@ function registerIpc() {
     await updateInstalledProjects();
     return getBootstrapData();
   });
+
+  ipcMain.handle("set-auto-launch", async (_event, enabled) => ({
+    autoLaunchEnabled: setAutoLaunchEnabled(enabled)
+  }));
 
   ipcMain.handle("remove-project", async (_event, projectId) => {
     const nextProjects = store.getProjects().map((project) => {
