@@ -41,6 +41,7 @@ let isCalendarUploadBeforeCloseDone = false;
 let isCalendarUploadBeforeCloseRunning = false;
 const APP_USER_MODEL_ID = "com.hanburger.desktop";
 const CALENDAR_WIDGET_STARTUP_ARG = "--calendar-widget-startup";
+const CALENDAR_WIDGET_STARTUP_NAME = "Han Burger Calendar 小工具";
 const CALENDAR_WIDGET_SIZE = {
   width: 760,
   height: 620
@@ -277,6 +278,7 @@ function getCalendarProject() {
 
 function getAutoLaunchEnabled() {
   return app.getLoginItemSettings({
+    name: CALENDAR_WIDGET_STARTUP_NAME,
     path: process.execPath,
     args: [CALENDAR_WIDGET_STARTUP_ARG]
   }).openAtLogin;
@@ -290,6 +292,7 @@ function setAutoLaunchEnabled(enabled) {
 
   app.setLoginItemSettings({
     openAtLogin: Boolean(enabled),
+    name: CALENDAR_WIDGET_STARTUP_NAME,
     path: process.execPath,
     args: [CALENDAR_WIDGET_STARTUP_ARG]
   });
