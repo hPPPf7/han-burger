@@ -115,7 +115,7 @@ function renderVersionInfo() {
 }
 
 function renderAutoLaunch() {
-  elements.autoLaunchButton.textContent = `開機自啟動：${state.autoLaunchEnabled ? "開啟" : "關閉"}`;
+  elements.autoLaunchButton.textContent = `小工具開機自啟動：${state.autoLaunchEnabled ? "開啟" : "關閉"}`;
   elements.autoLaunchButton.classList.toggle("is-active", state.autoLaunchEnabled);
 }
 

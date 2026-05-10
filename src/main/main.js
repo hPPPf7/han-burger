@@ -40,6 +40,7 @@ let calendarStartupResult = null;
 let isCalendarUploadBeforeCloseDone = false;
 let isCalendarUploadBeforeCloseRunning = false;
 const APP_USER_MODEL_ID = "com.hanburger.desktop";
+const CALENDAR_WIDGET_STARTUP_ARG = "--calendar-widget-startup";
 const CALENDAR_WIDGET_SIZE = {
   width: 760,
   height: 620
@@ -170,9 +171,40 @@ function saveWindowState() {
     return;
   }
 
+  const currentState = store.getWindowState?.() || {};
   store.saveWindowState({
+    ...currentState,
     bounds: mainWindow.isMaximized() ? mainWindow.getNormalBounds() : mainWindow.getBounds(),
     isMaximized: mainWindow.isMaximized()
+  });
+}
+
+function getSavedCalendarWidgetState() {
+  const widgetState = store?.getWindowState?.()?.calendarWidget || {};
+  const bounds = widgetState.bounds || {};
+  return {
+    bounds: {
+      width: Math.max(CALENDAR_WIDGET_SIZE.width, Math.round(Number(bounds.width) || CALENDAR_WIDGET_SIZE.width)),
+      height: Math.max(CALENDAR_WIDGET_SIZE.height, Math.round(Number(bounds.height) || CALENDAR_WIDGET_SIZE.height)),
+      x: Number.isFinite(bounds.x) ? bounds.x : null,
+      y: Number.isFinite(bounds.y) ? bounds.y : null
+    },
+    opacity: Math.min(1, Math.max(0.35, Number(widgetState.opacity) || calendarWidgetOpacity))
+  };
+}
+
+function saveCalendarWidgetState() {
+  if (!calendarWidgetWindow || calendarWidgetWindow.isDestroyed() || !store) {
+    return;
+  }
+
+  const currentState = store.getWindowState?.() || {};
+  store.saveWindowState({
+    ...currentState,
+    calendarWidget: {
+      bounds: calendarWidgetWindow.getBounds(),
+      opacity: calendarWidgetOpacity
+    }
   });
 }
 
@@ -244,13 +276,22 @@ function getCalendarProject() {
 }
 
 function getAutoLaunchEnabled() {
-  return app.getLoginItemSettings().openAtLogin;
+  return app.getLoginItemSettings({
+    path: process.execPath,
+    args: [CALENDAR_WIDGET_STARTUP_ARG]
+  }).openAtLogin;
 }
 
 function setAutoLaunchEnabled(enabled) {
   app.setLoginItemSettings({
-    openAtLogin: Boolean(enabled),
+    openAtLogin: false,
     path: process.execPath
+  });
+
+  app.setLoginItemSettings({
+    openAtLogin: Boolean(enabled),
+    path: process.execPath,
+    args: [CALENDAR_WIDGET_STARTUP_ARG]
   });
 
   return getAutoLaunchEnabled();
@@ -365,15 +406,24 @@ async function openCalendarWidget(theme = "dark") {
   const widgetUrl = new URL(pathToFileURL(project.entryFilePath).toString());
   widgetUrl.searchParams.set("widget", "1");
   widgetUrl.searchParams.set("theme", theme === "light" ? "light" : "dark");
-  widgetUrl.searchParams.set("opacity", String(Math.round(calendarWidgetOpacity * 100)));
-  widgetUrl.searchParams.set("scale", String(Math.round(calendarWidgetScale * 100)));
 
   const workArea = screen.getPrimaryDisplay().workArea;
+  const savedWidgetState = getSavedCalendarWidgetState();
+  calendarWidgetOpacity = savedWidgetState.opacity;
+  calendarWidgetScale = Math.max(
+    1,
+    Math.max(
+      savedWidgetState.bounds.width / CALENDAR_WIDGET_SIZE.width,
+      savedWidgetState.bounds.height / CALENDAR_WIDGET_SIZE.height
+    )
+  );
+  widgetUrl.searchParams.set("opacity", String(Math.round(calendarWidgetOpacity * 100)));
+  widgetUrl.searchParams.set("scale", String(Math.round(calendarWidgetScale * 100)));
   const widgetBounds = {
-    width: Math.round(CALENDAR_WIDGET_SIZE.width * calendarWidgetScale),
-    height: Math.round(CALENDAR_WIDGET_SIZE.height * calendarWidgetScale),
-    x: workArea.x + 24,
-    y: workArea.y + 24
+    width: Math.round(savedWidgetState.bounds.width),
+    height: Math.round(savedWidgetState.bounds.height),
+    x: Number.isFinite(savedWidgetState.bounds.x) ? savedWidgetState.bounds.x : workArea.x + 24,
+    y: Number.isFinite(savedWidgetState.bounds.y) ? savedWidgetState.bounds.y : workArea.y + 24
   };
 
   calendarWidgetWindow = new BrowserWindow({
@@ -381,8 +431,8 @@ async function openCalendarWidget(theme = "dark") {
     height: widgetBounds.height,
     x: widgetBounds.x,
     y: widgetBounds.y,
-    minWidth: Math.round(CALENDAR_WIDGET_SIZE.width * 0.65),
-    minHeight: Math.round(CALENDAR_WIDGET_SIZE.height * 0.65),
+    minWidth: CALENDAR_WIDGET_SIZE.width,
+    minHeight: CALENDAR_WIDGET_SIZE.height,
     title: "Han Burger Calendar",
     backgroundColor: theme === "light" ? "#efe7d8" : "#0e0c0a",
     show: false,
@@ -400,6 +450,8 @@ async function openCalendarWidget(theme = "dark") {
     }
   });
   calendarWidgetWindow.setOpacity(calendarWidgetOpacity);
+  calendarWidgetWindow.on("move", saveCalendarWidgetState);
+  calendarWidgetWindow.on("resize", saveCalendarWidgetState);
 
   calendarWidgetWindow.on("closed", () => {
     calendarWidgetWindow = null;
@@ -446,6 +498,7 @@ function moveCalendarWidget(deltaX, deltaY) {
     y: bounds.y + Math.round(Number(deltaY) || 0)
   };
   calendarWidgetWindow.setBounds(nextBounds, false);
+  saveCalendarWidgetState();
   return { moved: true, bounds: nextBounds };
 }
 
@@ -455,13 +508,14 @@ function setCalendarWidgetOpacity(value) {
 
   if (calendarWidgetWindow && !calendarWidgetWindow.isDestroyed()) {
     calendarWidgetWindow.setOpacity(opacity);
+    saveCalendarWidgetState();
   }
 
   return { opacity };
 }
 
 function setCalendarWidgetScale(value) {
-  const scale = Math.min(1.5, Math.max(0.65, Number(value) || calendarWidgetScale));
+  const scale = Math.min(1.5, Math.max(1, Number(value) || calendarWidgetScale));
   calendarWidgetScale = scale;
 
   if (!calendarWidgetWindow || calendarWidgetWindow.isDestroyed()) {
@@ -476,6 +530,7 @@ function setCalendarWidgetScale(value) {
     width: nextWidth,
     height: nextHeight
   }, false);
+  saveCalendarWidgetState();
 
   return {
     scale,
@@ -489,8 +544,8 @@ function resizeCalendarWidget(deltaX, deltaY) {
   }
 
   const bounds = calendarWidgetWindow.getBounds();
-  const minWidth = Math.round(CALENDAR_WIDGET_SIZE.width * 0.65);
-  const minHeight = Math.round(CALENDAR_WIDGET_SIZE.height * 0.65);
+  const minWidth = CALENDAR_WIDGET_SIZE.width;
+  const minHeight = CALENDAR_WIDGET_SIZE.height;
   const maxWidth = Math.round(CALENDAR_WIDGET_SIZE.width * 1.5);
   const maxHeight = Math.round(CALENDAR_WIDGET_SIZE.height * 1.5);
   const requestedWidth = bounds.width + Math.round(Number(deltaX) || 0);
@@ -499,13 +554,14 @@ function resizeCalendarWidget(deltaX, deltaY) {
   const nextHeight = Math.min(maxHeight, Math.max(minHeight, requestedHeight));
   const scaleByWidth = nextWidth / CALENDAR_WIDGET_SIZE.width;
   const scaleByHeight = nextHeight / CALENDAR_WIDGET_SIZE.height;
-  calendarWidgetScale = Math.min(1.5, Math.max(0.65, Math.max(scaleByWidth, scaleByHeight)));
+  calendarWidgetScale = Math.min(1.5, Math.max(1, Math.max(scaleByWidth, scaleByHeight)));
 
   calendarWidgetWindow.setBounds({
     ...bounds,
     width: nextWidth,
     height: nextHeight
   }, false);
+  saveCalendarWidgetState();
 
   return {
     resized: true,
@@ -516,6 +572,7 @@ function resizeCalendarWidget(deltaX, deltaY) {
 
 function createWindow() {
   const windowOptions = getSavedWindowOptions();
+  const shouldStartCalendarWidgetOnly = process.argv.includes(CALENDAR_WIDGET_STARTUP_ARG);
   isCalendarUploadBeforeCloseDone = false;
   isCalendarUploadBeforeCloseRunning = false;
   mainWindow = new BrowserWindow({
@@ -563,6 +620,16 @@ function createWindow() {
 
     startCalendarStartupSync();
 
+    if (shouldStartCalendarWidgetOnly) {
+      openCalendarWidget().catch((error) => {
+        recordError("calendar-widget-startup", error);
+        if (mainWindow && !mainWindow.isDestroyed()) {
+          mainWindow.show();
+          mainWindow.focus();
+        }
+      });
+    }
+
     updateInstalledProjects().catch((error) => {
       recordError("project-update-startup", error);
       sendToMainWindow("project-update-status", {
@@ -574,6 +641,10 @@ function createWindow() {
   });
 
   mainWindow.once("ready-to-show", () => {
+    if (shouldStartCalendarWidgetOnly) {
+      return;
+    }
+
     mainWindow.show();
     mainWindow.focus();
   });
